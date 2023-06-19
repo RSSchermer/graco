@@ -1,4 +1,7 @@
 [workspace]
 members = [
     "graco",
+    "graph-loading",
+    "examples/web/match_pairs_by_edge_weight",
+    "web-viewer"
 ]

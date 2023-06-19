@@ -1,0 +1,13 @@
+[package]
+name = "web-viewer"
+version = "0.1.0"
+authors = ["RSSchermer <roland0507@gmail.com>"]
+edition = "2021"
+publish = false
+
+[dependencies]
+arwa = { version = "0.1.1", path = "../../rudo/arwa" }
+empa = { path = "../../glitz/empa" }
+empa-glam = { version = "0.1.0", path = "../../glitz/empa_glam" }
+glam = "0.21.3"
+zeroable = { path = "../../zeroable_crates/zeroable" }
