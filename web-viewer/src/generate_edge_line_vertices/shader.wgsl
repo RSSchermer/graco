@@ -4,33 +4,39 @@ struct EdgeVertex {
 }
 
 @group(0) @binding(0)
-var<storage, read> nodes_edge_offset: array<u32>;
+var<uniform> node_count: u32;
 
 @group(0) @binding(1)
-var<storage, read> nodes_edges: array<u32>;
+var<uniform> edge_ref_count: u32;
 
 @group(0) @binding(2)
-var<storage, read> nodes_position: array<vec2<f32>>;
+var<storage, read> nodes_edge_offset: array<u32>;
 
 @group(0) @binding(3)
-var<storage, read> nodes_matching: array<u32>;
+var<storage, read> nodes_edges: array<u32>;
 
 @group(0) @binding(4)
+var<storage, read> nodes_position: array<vec2<f32>>;
+
+@group(0) @binding(5)
+var<storage, read> nodes_matching: array<u32>;
+
+@group(0) @binding(6)
 var<storage, read_write> edge_vertices: array<EdgeVertex>;
 
 @compute @workgroup_size(256, 1, 1)
 fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let index = global_id.x;
 
-    if index >= arrayLength(&nodes_edge_offset) {
+    if index >= node_count {
         return;
     }
 
     let edges_start = nodes_edge_offset[index];
 
-    var edges_end = arrayLength(&nodes_edges);
+    var edges_end = edge_ref_count;
 
-    if index < arrayLength(&nodes_edge_offset) - 1 {
+    if index < node_count - 1 {
         edges_end = nodes_edge_offset[index + 1];
     }
 

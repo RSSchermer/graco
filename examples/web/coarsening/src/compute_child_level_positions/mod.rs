@@ -8,49 +8,44 @@ use empa::resource_binding::BindGroupLayout;
 use empa::shader_module::{shader_source, ShaderSource};
 use empa::{abi, buffer};
 
-use crate::edge_vertex::EdgeVertex;
-
-const GROUP_SIZE: u32 = 256;
+const GROUPS_SIZE: u32 = 256;
 
 const SHADER: ShaderSource = shader_source!("shader.wgsl");
 
 #[derive(empa::resource_binding::Resources)]
 struct Resources {
     #[resource(binding = 0, visibility = "COMPUTE")]
-    node_count: Uniform<u32>,
+    child_level_node_count: Uniform<u32>,
     #[resource(binding = 1, visibility = "COMPUTE")]
-    edge_ref_count: Uniform<u32>,
+    parent_level_node_count: Uniform<u32>,
     #[resource(binding = 2, visibility = "COMPUTE")]
-    nodes_edge_offset: ReadOnlyStorage<[u32]>,
+    parent_level_positions: ReadOnlyStorage<[abi::Vec2<f32>]>,
     #[resource(binding = 3, visibility = "COMPUTE")]
-    nodes_edges: ReadOnlyStorage<[u32]>,
+    coarse_nodes_mapping_offset: ReadOnlyStorage<[u32]>,
     #[resource(binding = 4, visibility = "COMPUTE")]
-    nodes_position: ReadOnlyStorage<[abi::Vec2<f32>]>,
+    coarse_nodes_mapping: ReadOnlyStorage<[u32]>,
     #[resource(binding = 5, visibility = "COMPUTE")]
-    nodes_matching: ReadOnlyStorage<[u32]>,
-    #[resource(binding = 6, visibility = "COMPUTE")]
-    edge_vertices: Storage<[EdgeVertex]>,
+    child_level_positions: Storage<[abi::Vec2<f32>]>,
 }
 
 type ResourcesLayout = <Resources as empa::resource_binding::Resources>::Layout;
 
-pub struct GenerateEdgeLineVerticesInput<'a, U0, U1, U2, U3, U4, U5, U6> {
-    pub node_count: buffer::View<'a, u32, U0>,
-    pub edge_ref_count: buffer::View<'a, u32, U1>,
-    pub nodes_edge_offset: buffer::View<'a, [u32], U2>,
-    pub nodes_edges: buffer::View<'a, [u32], U3>,
-    pub nodes_position: buffer::View<'a, [abi::Vec2<f32>], U4>,
-    pub nodes_matching: buffer::View<'a, [u32], U5>,
-    pub edge_vertices: buffer::View<'a, [EdgeVertex], U6>,
+pub struct ComputeChildLevelPositionsInput<'a, U0, U1, U2, U3, U4, U5> {
+    pub child_level_node_count: buffer::View<'a, u32, U0>,
+    pub parent_level_node_count: buffer::View<'a, u32, U1>,
+    pub parent_level_positions: buffer::View<'a, [abi::Vec2<f32>], U2>,
+    pub coarse_nodes_mapping_offset: buffer::View<'a, [u32], U3>,
+    pub coarse_nodes_mapping: buffer::View<'a, [u32], U4>,
+    pub child_level_positions: buffer::View<'a, [abi::Vec2<f32>], U5>,
 }
 
-pub struct GenerateEdgeLineVertices {
+pub struct ComputeChildLevelPositions {
     device: Device,
     bind_group_layout: BindGroupLayout<ResourcesLayout>,
     pipeline: ComputePipeline<(ResourcesLayout,)>,
 }
 
-impl GenerateEdgeLineVertices {
+impl ComputeChildLevelPositions {
     pub fn init(device: Device) -> Self {
         let shader = device.create_shader_module(&SHADER);
 
@@ -64,17 +59,17 @@ impl GenerateEdgeLineVertices {
                 .finish(),
         );
 
-        GenerateEdgeLineVertices {
+        ComputeChildLevelPositions {
             device,
             bind_group_layout,
             pipeline,
         }
     }
 
-    pub fn encode<U0, U1, U2, U3, U4, U5, U6>(
+    pub fn encode<U0, U1, U2, U3, U4, U5>(
         &self,
         encoder: CommandEncoder,
-        input: GenerateEdgeLineVerticesInput<U0, U1, U2, U3, U4, U5, U6>,
+        input: ComputeChildLevelPositionsInput<U0, U1, U2, U3, U4, U5>,
     ) -> CommandEncoder
     where
         U0: buffer::UniformBinding,
@@ -83,30 +78,27 @@ impl GenerateEdgeLineVertices {
         U3: buffer::StorageBinding,
         U4: buffer::StorageBinding,
         U5: buffer::StorageBinding,
-        U6: buffer::StorageBinding,
     {
-        let GenerateEdgeLineVerticesInput {
-            node_count,
-            edge_ref_count,
-            nodes_edge_offset,
-            nodes_edges,
-            nodes_position,
-            nodes_matching,
-            edge_vertices,
+        let ComputeChildLevelPositionsInput {
+            child_level_node_count,
+            parent_level_node_count,
+            parent_level_positions,
+            coarse_nodes_mapping_offset,
+            coarse_nodes_mapping,
+            child_level_positions,
         } = input;
 
-        let workgroups = (nodes_edge_offset.len() as u32).div_ceil(GROUP_SIZE);
+        let workgroups = (coarse_nodes_mapping_offset.len() as u32).div_ceil(GROUPS_SIZE);
 
         let bind_group = self.device.create_bind_group(
             &self.bind_group_layout,
             Resources {
-                node_count: node_count.uniform(),
-                edge_ref_count: edge_ref_count.uniform(),
-                nodes_edge_offset: nodes_edge_offset.read_only_storage(),
-                nodes_edges: nodes_edges.read_only_storage(),
-                nodes_position: nodes_position.read_only_storage(),
-                nodes_matching: nodes_matching.read_only_storage(),
-                edge_vertices: edge_vertices.storage(),
+                child_level_node_count: child_level_node_count.uniform(),
+                parent_level_node_count: parent_level_node_count.uniform(),
+                parent_level_positions: parent_level_positions.read_only_storage(),
+                coarse_nodes_mapping_offset: coarse_nodes_mapping_offset.read_only_storage(),
+                coarse_nodes_mapping: coarse_nodes_mapping.read_only_storage(),
+                child_level_positions: child_level_positions.storage(),
             },
         );
 

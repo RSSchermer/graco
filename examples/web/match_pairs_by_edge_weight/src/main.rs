@@ -14,7 +14,10 @@ use empa::device::DeviceDescriptor;
 use empa::texture::format::rgba8unorm;
 use empa::{abi, buffer, texture};
 use futures::FutureExt;
-use graco::matching::{MatchPairsByEdgeWeight, MatchPairsByEdgeWeightInput};
+use graco::matching::{
+    MatchPairsByEdgeWeight, MatchPairsByEdgeWeightConfig, MatchPairsByEdgeWeightInput,
+    MatchPairsByEdgeWeightsCounts,
+};
 use graph_loading::GraphData;
 use web_viewer::{GraphRenderer, GraphRendererInput};
 
@@ -22,7 +25,7 @@ struct GraphState {
     nodes_edge_offset: Vec<u32>,
     nodes_position: Vec<abi::Vec2<f32>>,
     nodes_edges: Vec<u32>,
-    nodes_edge_weights: Vec<f32>,
+    nodes_edge_weights: Vec<u32>,
 }
 
 fn main() {
@@ -50,7 +53,7 @@ async fn load_graph_state_from_file(filename: &str) -> Result<GraphState, Box<dy
         nodes_position.push(abi::Vec2(rng.rand_float(), rng.rand_float()));
     }
 
-    let mut nodes_edge_weights = vec![0.0; nodes_edges.len()];
+    let mut nodes_edge_weights = vec![0; nodes_edges.len()];
 
     for i in 0..node_count {
         let edges_start = nodes_edge_offset[i];
@@ -72,8 +75,9 @@ async fn load_graph_state_from_file(filename: &str) -> Result<GraphState, Box<dy
             let d_y = pos_b.1 - pos_a.1;
 
             let weight = (d_x * d_x + d_y * d_y).sqrt();
+            let weight_inv = 1.0 / weight;
 
-            nodes_edge_weights[j as usize] = 1.0 / weight;
+            nodes_edge_weights[j as usize] = (weight_inv * 1000.0) as u32;
         }
     }
 
@@ -108,13 +112,14 @@ fn generate_regular_graph_state(grid_size: u32, perturbation_factor: f32) -> Gra
         )
     };
 
-    fn compute_edge_weight(pos_a: abi::Vec2<f32>, pos_b: abi::Vec2<f32>) -> f32 {
+    fn compute_edge_weight(pos_a: abi::Vec2<f32>, pos_b: abi::Vec2<f32>) -> u32 {
         let d_x = pos_b.0 - pos_a.0;
         let d_y = pos_b.1 - pos_a.1;
 
         let distance = (d_x * d_x + d_y * d_y).sqrt();
+        let distance_inv = 1.0 / distance;
 
-        1.0 / distance
+        (distance_inv * 1000.0) as u32
     }
 
     for row in 0..grid_size {
@@ -193,10 +198,6 @@ async fn render() -> Result<(), Box<dyn Error>> {
         alpha_mode: AlphaMode::Opaque,
     });
 
-    // let GraphState {
-    //     nodes_edge_offset, nodes_position, nodes_edges, nodes_edge_weights
-    // } = load_graph_state_from_file("karate.graph").await?;
-
     let GraphState {
         nodes_edge_offset,
         nodes_position,
@@ -204,7 +205,13 @@ async fn render() -> Result<(), Box<dyn Error>> {
         nodes_edge_weights,
     } = generate_regular_graph_state(50, 0.45);
 
-    let mut matcher = MatchPairsByEdgeWeight::init(device.clone(), Default::default());
+    let mut matcher = MatchPairsByEdgeWeight::init(
+        device.clone(),
+        MatchPairsByEdgeWeightConfig {
+            rounds: 8,
+            prng_seed: 1,
+        },
+    );
     let renderer = GraphRenderer::init(device.clone());
 
     let mut encoder = device.create_command_encoder();
@@ -213,12 +220,23 @@ async fn render() -> Result<(), Box<dyn Error>> {
         device.create_buffer(nodes_edge_offset, buffer::Usages::storage_binding());
     let nodes_edges: Buffer<[u32], _> =
         device.create_buffer(nodes_edges, buffer::Usages::storage_binding());
-    let nodes_edge_weights: Buffer<[f32], _> =
-        device.create_buffer(nodes_edge_weights, buffer::Usages::storage_binding());
-    let nodes_matching = device
-        .create_slice_buffer_zeroed(nodes_edge_offset.len(), buffer::Usages::storage_binding());
+    let nodes_edge_weights: Buffer<[u32], _> = device.create_buffer(
+        nodes_edge_weights,
+        buffer::Usages::storage_binding().and_copy_src(),
+    );
+    let nodes_matching = device.create_slice_buffer_zeroed(
+        nodes_edge_offset.len(),
+        buffer::Usages::storage_binding().and_copy_src(),
+    );
     let nodes_position: Buffer<[abi::Vec2<f32>], _> =
         device.create_buffer(nodes_position, buffer::Usages::storage_binding());
+
+    let node_count = device.create_buffer(
+        nodes_edge_offset.len() as u32,
+        buffer::Usages::uniform_binding(),
+    );
+    let edge_ref_count =
+        device.create_buffer(nodes_edges.len() as u32, buffer::Usages::uniform_binding());
 
     encoder = matcher.encode(
         encoder,
@@ -226,6 +244,10 @@ async fn render() -> Result<(), Box<dyn Error>> {
             nodes_edge_offset: nodes_edge_offset.view(),
             nodes_edges: nodes_edges.view(),
             nodes_edge_weights: nodes_edge_weights.view(),
+            count: Some(MatchPairsByEdgeWeightsCounts {
+                node_count: node_count.uniform(),
+                edge_ref_count: edge_ref_count.uniform(),
+            }),
         },
         nodes_matching.view(),
     );
@@ -234,6 +256,8 @@ async fn render() -> Result<(), Box<dyn Error>> {
         encoder,
         GraphRendererInput {
             output_texture: &context.get_current_texture(),
+            node_count: node_count.view(),
+            edge_ref_count: edge_ref_count.view(),
             nodes_edge_offset: nodes_edge_offset.view(),
             nodes_edges: nodes_edges.view(),
             nodes_matching: nodes_matching.view(),

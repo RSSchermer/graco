@@ -112,14 +112,16 @@ impl DrawPointTriangles {
         }
     }
 
-    pub fn render_bundle<U0, U1>(
+    pub fn render_bundle<U0, U1, U2>(
         &self,
         nodes_position: buffer::View<[abi::Vec2<f32>], U0>,
         transform: buffer::View<abi::Mat3x3, U1>,
+        dispatch: buffer::View<DrawIndexed, U2>,
     ) -> RenderBundle<RenderLayout<rgba8unorm, ()>>
     where
         U0: buffer::StorageBinding,
         U1: buffer::UniformBinding,
+        U2: buffer::Indirect,
     {
         let bind_group = self.device.create_bind_group(
             &self.bind_group_layout,
@@ -135,13 +137,7 @@ impl DrawPointTriangles {
             .set_vertex_buffers(self.triangle_vertices.view())
             .set_index_buffer(self.triangle_indices.view())
             .set_bind_groups(&bind_group)
-            .draw_indexed(DrawIndexed {
-                index_count: self.triangle_indices.len() as u32,
-                instance_count: nodes_position.len() as u32,
-                first_index: 0,
-                first_instance: 0,
-                base_vertex: 0,
-            })
+            .draw_indexed_indirect(dispatch)
             .finish()
     }
 }

@@ -2,6 +2,7 @@
 members = [
     "graco",
     "graph-loading",
+    "examples/web/coarsening",
     "examples/web/match_pairs_by_edge_weight",
     "web-viewer"
 ]

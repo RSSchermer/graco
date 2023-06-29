@@ -9,5 +9,6 @@ edition = "2021"
 
 [dependencies]
 empa = { version = "0.1.0", path = "../../glitz/empa" }
+empa-tk = { path = "../../empa-tk/empa-tk" }
 oorandom = "11.1.3"
 zeroable = { path = "../../zeroable_crates/zeroable" }

@@ -67,14 +67,16 @@ impl DrawEdgeLines {
         }
     }
 
-    pub fn render_bundle<U0, U1>(
+    pub fn render_bundle<U0, U1, U2>(
         &self,
         edge_vertices: buffer::View<[EdgeVertex], U0>,
         transform: buffer::View<abi::Mat3x3, U1>,
+        dispatch: buffer::View<Draw, U2>,
     ) -> RenderBundle<RenderLayout<rgba8unorm, ()>>
     where
         U0: buffer::Vertex,
         U1: buffer::UniformBinding,
+        U2: buffer::Indirect,
     {
         let bind_group = self.device.create_bind_group(
             &self.bind_group_layout,
@@ -88,12 +90,7 @@ impl DrawEdgeLines {
             .set_pipeline(&self.pipeline)
             .set_vertex_buffers(edge_vertices)
             .set_bind_groups(&bind_group)
-            .draw(Draw {
-                vertex_count: edge_vertices.len() as u32,
-                instance_count: 1,
-                first_vertex: 0,
-                first_instance: 0,
-            })
+            .draw_indirect(dispatch)
             .finish()
     }
 }

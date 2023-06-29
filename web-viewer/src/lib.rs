@@ -2,7 +2,8 @@
 
 mod draw_edge_lines;
 mod draw_point_triangles;
-pub mod edge_vertex;
+mod edge_vertex;
+mod generate_dispatches;
 mod generate_edge_line_vertices;
 
 mod renderer;

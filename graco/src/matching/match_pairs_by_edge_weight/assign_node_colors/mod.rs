@@ -9,28 +9,23 @@ use empa::resource_binding::BindGroupLayout;
 use empa::shader_module::{shader_source, ShaderSource};
 
 use crate::matching::match_pairs_by_edge_weight::match_state::MatchState;
-
-const GROUPS_SIZE: u32 = 256;
+use crate::matching::match_pairs_by_edge_weight::GROUP_SIZE;
 
 const SHADER: ShaderSource = shader_source!("shader.wgsl");
 
 #[derive(empa::resource_binding::Resources)]
-struct Resources {
+pub struct AssignNodeColorsResources {
     #[resource(binding = 0, visibility = "COMPUTE")]
-    prng_seed: Uniform<u32>,
+    pub count: Uniform<u32>,
     #[resource(binding = 1, visibility = "COMPUTE")]
-    nodes_match_state: Storage<[MatchState]>,
+    pub prng_seed: Uniform<u32>,
     #[resource(binding = 2, visibility = "COMPUTE")]
-    has_live_nodes: Storage<u32>,
+    pub nodes_match_state: Storage<[MatchState]>,
+    #[resource(binding = 3, visibility = "COMPUTE")]
+    pub has_live_nodes: Storage<u32>,
 }
 
-type ResourcesLayout = <Resources as empa::resource_binding::Resources>::Layout;
-
-pub struct AssignNodeColorsInput<'a, U0, U1, U2> {
-    pub prng_seed: buffer::View<'a, u32, U0>,
-    pub nodes_match_state: buffer::View<'a, [MatchState], U1>,
-    pub has_live_nodes: buffer::View<'a, u32, U2>,
-}
+type ResourcesLayout = <AssignNodeColorsResources as empa::resource_binding::Resources>::Layout;
 
 pub struct AssignNodeColors {
     device: Device,
@@ -59,42 +54,36 @@ impl AssignNodeColors {
         }
     }
 
-    pub fn encode<U0, U1, U2>(
+    pub fn encode<U>(
         &self,
         encoder: CommandEncoder,
-        input: AssignNodeColorsInput<U0, U1, U2>,
+        resources: AssignNodeColorsResources,
+        dispatch_indirect: bool,
+        dispatch: buffer::View<DispatchWorkgroups, U>,
+        fallback_count: u32,
     ) -> CommandEncoder
     where
-        U0: buffer::UniformBinding,
-        U1: buffer::StorageBinding,
-        U2: buffer::StorageBinding,
+        U: buffer::Indirect,
     {
-        let AssignNodeColorsInput {
-            prng_seed,
-            nodes_match_state,
-            has_live_nodes,
-        } = input;
+        let bind_group = self
+            .device
+            .create_bind_group(&self.bind_group_layout, resources);
 
-        let workgroups = (nodes_match_state.len() as u32).div_ceil(GROUPS_SIZE);
-
-        let bind_group = self.device.create_bind_group(
-            &self.bind_group_layout,
-            Resources {
-                prng_seed: prng_seed.uniform(),
-                nodes_match_state: nodes_match_state.storage(),
-                has_live_nodes: has_live_nodes.storage(),
-            },
-        );
-
-        encoder
+        let encoder = encoder
             .begin_compute_pass()
             .set_pipeline(&self.pipeline)
-            .set_bind_groups(&bind_group)
-            .dispatch_workgroups(DispatchWorkgroups {
-                count_x: workgroups,
-                count_y: 1,
-                count_z: 1,
-            })
-            .end()
+            .set_bind_groups(&bind_group);
+
+        if dispatch_indirect {
+            encoder.dispatch_workgroups_indirect(dispatch).end()
+        } else {
+            encoder
+                .dispatch_workgroups(DispatchWorkgroups {
+                    count_x: fallback_count.div_ceil(GROUP_SIZE),
+                    count_y: 1,
+                    count_z: 1,
+                })
+                .end()
+        }
     }
 }

@@ -9,37 +9,31 @@ use empa::resource_binding::BindGroupLayout;
 use empa::shader_module::{shader_source, ShaderSource};
 
 use crate::matching::match_pairs_by_edge_weight::match_state::MatchState;
-
-const GROUPS_SIZE: u32 = 256;
+use crate::matching::match_pairs_by_edge_weight::GROUP_SIZE;
 
 const SHADER: ShaderSource = shader_source!("shader.wgsl");
 
 #[derive(empa::resource_binding::Resources)]
-struct Resources {
+pub struct FindMatchesResources {
     #[resource(binding = 0, visibility = "COMPUTE")]
-    has_live_nodes: Uniform<u32>,
+    pub node_count: Uniform<u32>,
     #[resource(binding = 1, visibility = "COMPUTE")]
-    nodes_match_state: Storage<[MatchState]>,
+    pub edge_ref_count: Uniform<u32>,
     #[resource(binding = 2, visibility = "COMPUTE")]
-    nodes_edge_offset: ReadOnlyStorage<[u32]>,
+    pub has_live_nodes: Uniform<u32>,
     #[resource(binding = 3, visibility = "COMPUTE")]
-    nodes_edges: ReadOnlyStorage<[u32]>,
+    pub nodes_match_state: Storage<[MatchState]>,
     #[resource(binding = 4, visibility = "COMPUTE")]
-    nodes_edge_weights: ReadOnlyStorage<[f32]>,
+    pub nodes_edge_offset: ReadOnlyStorage<[u32]>,
     #[resource(binding = 5, visibility = "COMPUTE")]
-    nodes_proposal: ReadOnlyStorage<[u32]>,
+    pub nodes_edges: ReadOnlyStorage<[u32]>,
+    #[resource(binding = 6, visibility = "COMPUTE")]
+    pub nodes_edge_weights: ReadOnlyStorage<[u32]>,
+    #[resource(binding = 7, visibility = "COMPUTE")]
+    pub nodes_proposal: ReadOnlyStorage<[u32]>,
 }
 
-type ResourcesLayout = <Resources as empa::resource_binding::Resources>::Layout;
-
-pub struct FindMatchesInput<'a, U0, U1, U2, U3, U4, U5> {
-    pub has_live_nodes: buffer::View<'a, u32, U0>,
-    pub nodes_match_state: buffer::View<'a, [MatchState], U1>,
-    pub nodes_edge_offset: buffer::View<'a, [u32], U2>,
-    pub nodes_edges: buffer::View<'a, [u32], U3>,
-    pub nodes_edge_weights: buffer::View<'a, [f32], U4>,
-    pub nodes_proposal: buffer::View<'a, [u32], U5>,
-}
+type ResourcesLayout = <FindMatchesResources as empa::resource_binding::Resources>::Layout;
 
 pub struct FindMatches {
     device: Device,
@@ -68,51 +62,36 @@ impl FindMatches {
         }
     }
 
-    pub fn encode<U0, U1, U2, U3, U4, U5>(
+    pub fn encode<U>(
         &self,
         encoder: CommandEncoder,
-        input: FindMatchesInput<U0, U1, U2, U3, U4, U5>,
+        resources: FindMatchesResources,
+        dispatch_indirect: bool,
+        dispatch: buffer::View<DispatchWorkgroups, U>,
+        fallback_count: u32,
     ) -> CommandEncoder
     where
-        U0: buffer::UniformBinding,
-        U1: buffer::StorageBinding,
-        U2: buffer::StorageBinding,
-        U3: buffer::StorageBinding,
-        U4: buffer::StorageBinding,
-        U5: buffer::StorageBinding,
+        U: buffer::Indirect,
     {
-        let FindMatchesInput {
-            has_live_nodes,
-            nodes_match_state,
-            nodes_edge_offset,
-            nodes_edges,
-            nodes_edge_weights,
-            nodes_proposal,
-        } = input;
+        let bind_group = self
+            .device
+            .create_bind_group(&self.bind_group_layout, resources);
 
-        let workgroups = (nodes_match_state.len() as u32).div_ceil(GROUPS_SIZE);
-
-        let bind_group = self.device.create_bind_group(
-            &self.bind_group_layout,
-            Resources {
-                has_live_nodes: has_live_nodes.uniform(),
-                nodes_match_state: nodes_match_state.storage(),
-                nodes_edge_offset: nodes_edge_offset.read_only_storage(),
-                nodes_edges: nodes_edges.read_only_storage(),
-                nodes_edge_weights: nodes_edge_weights.read_only_storage(),
-                nodes_proposal: nodes_proposal.read_only_storage(),
-            },
-        );
-
-        encoder
+        let encoder = encoder
             .begin_compute_pass()
             .set_pipeline(&self.pipeline)
-            .set_bind_groups(&bind_group)
-            .dispatch_workgroups(DispatchWorkgroups {
-                count_x: workgroups,
-                count_y: 1,
-                count_z: 1,
-            })
-            .end()
+            .set_bind_groups(&bind_group);
+
+        if dispatch_indirect {
+            encoder.dispatch_workgroups_indirect(dispatch).end()
+        } else {
+            encoder
+                .dispatch_workgroups(DispatchWorkgroups {
+                    count_x: fallback_count.div_ceil(GROUP_SIZE),
+                    count_y: 1,
+                    count_z: 1,
+                })
+                .end()
+        }
     }
 }

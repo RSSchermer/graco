@@ -1,0 +1,5 @@
+#pragma once
+
+const VALIDITY_INVALID_SELF_REFERENCE = 0u;
+const VALIDITY_INVALID_DUPLICATE = 1u;
+const VALIDITY_VALID = 2u;

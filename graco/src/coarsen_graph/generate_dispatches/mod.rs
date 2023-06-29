@@ -1,4 +1,3 @@
-use empa::buffer;
 use empa::buffer::{Storage, Uniform};
 use empa::command::{CommandEncoder, DispatchWorkgroups, ResourceBindingCommandEncoder};
 use empa::compute_pipeline::{
@@ -8,27 +7,31 @@ use empa::device::Device;
 use empa::resource_binding::BindGroupLayout;
 use empa::shader_module::{shader_source, ShaderSource};
 
-use crate::matching::match_pairs_by_edge_weight::GROUP_SIZE;
-
 const SHADER: ShaderSource = shader_source!("shader.wgsl");
 
 #[derive(empa::resource_binding::Resources)]
-pub struct FinalizeMatchingResources {
+pub struct GenerateDispatchesResources {
     #[resource(binding = 0, visibility = "COMPUTE")]
-    pub count: Uniform<u32>,
+    pub group_size: Uniform<u32>,
     #[resource(binding = 1, visibility = "COMPUTE")]
-    pub nodes_match_state: Storage<[u32]>,
+    pub node_count: Uniform<u32>,
+    #[resource(binding = 2, visibility = "COMPUTE")]
+    pub edge_ref_count: Uniform<u32>,
+    #[resource(binding = 3, visibility = "COMPUTE")]
+    pub node_count_dispatch: Storage<DispatchWorkgroups>,
+    #[resource(binding = 4, visibility = "COMPUTE")]
+    pub edge_ref_count_dispatch: Storage<DispatchWorkgroups>,
 }
 
-type ResourcesLayout = <FinalizeMatchingResources as empa::resource_binding::Resources>::Layout;
+type ResourcesLayout = <GenerateDispatchesResources as empa::resource_binding::Resources>::Layout;
 
-pub struct FinalizeMatching {
+pub struct GenerateDispatches {
     device: Device,
     bind_group_layout: BindGroupLayout<ResourcesLayout>,
     pipeline: ComputePipeline<(ResourcesLayout,)>,
 }
 
-impl FinalizeMatching {
+impl GenerateDispatches {
     pub fn init(device: Device) -> Self {
         let shader = device.create_shader_module(&SHADER);
 
@@ -42,43 +45,31 @@ impl FinalizeMatching {
                 .finish(),
         );
 
-        FinalizeMatching {
+        GenerateDispatches {
             device,
             bind_group_layout,
             pipeline,
         }
     }
 
-    pub fn encode<U>(
+    pub fn encode(
         &self,
         encoder: CommandEncoder,
-        resources: FinalizeMatchingResources,
-        dispatch_indirect: bool,
-        dispatch: buffer::View<DispatchWorkgroups, U>,
-        fallback_count: u32,
-    ) -> CommandEncoder
-    where
-        U: buffer::Indirect,
-    {
+        resources: GenerateDispatchesResources,
+    ) -> CommandEncoder {
         let bind_group = self
             .device
             .create_bind_group(&self.bind_group_layout, resources);
 
-        let encoder = encoder
+        encoder
             .begin_compute_pass()
             .set_pipeline(&self.pipeline)
-            .set_bind_groups(&bind_group);
-
-        if dispatch_indirect {
-            encoder.dispatch_workgroups_indirect(dispatch).end()
-        } else {
-            encoder
-                .dispatch_workgroups(DispatchWorkgroups {
-                    count_x: fallback_count.div_ceil(GROUP_SIZE),
-                    count_y: 1,
-                    count_z: 1,
-                })
-                .end()
-        }
+            .set_bind_groups(&bind_group)
+            .dispatch_workgroups(DispatchWorkgroups {
+                count_x: 1,
+                count_y: 1,
+                count_z: 1,
+            })
+            .end()
     }
 }

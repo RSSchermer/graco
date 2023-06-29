@@ -1,5 +1,5 @@
 use empa::buffer;
-use empa::buffer::{Storage, Uniform};
+use empa::buffer::{ReadOnlyStorage, Storage, Uniform};
 use empa::command::{CommandEncoder, DispatchWorkgroups, ResourceBindingCommandEncoder};
 use empa::compute_pipeline::{
     ComputePipeline, ComputePipelineDescriptorBuilder, ComputeStageBuilder,
@@ -8,27 +8,31 @@ use empa::device::Device;
 use empa::resource_binding::BindGroupLayout;
 use empa::shader_module::{shader_source, ShaderSource};
 
-use crate::matching::match_pairs_by_edge_weight::GROUP_SIZE;
+use crate::coarsen_graph::DEFAULT_GROUP_SIZE;
 
 const SHADER: ShaderSource = shader_source!("shader.wgsl");
 
 #[derive(empa::resource_binding::Resources)]
-pub struct FinalizeMatchingResources {
+pub struct CompactCoarseEdgesResources {
     #[resource(binding = 0, visibility = "COMPUTE")]
     pub count: Uniform<u32>,
     #[resource(binding = 1, visibility = "COMPUTE")]
-    pub nodes_match_state: Storage<[u32]>,
+    pub mapped_edges: ReadOnlyStorage<[u32]>,
+    #[resource(binding = 2, visibility = "COMPUTE")]
+    pub validity_prefix_sum: ReadOnlyStorage<[u32]>,
+    #[resource(binding = 3, visibility = "COMPUTE")]
+    pub coarse_nodes_edges: Storage<[u32]>,
 }
 
-type ResourcesLayout = <FinalizeMatchingResources as empa::resource_binding::Resources>::Layout;
+type ResourcesLayout = <CompactCoarseEdgesResources as empa::resource_binding::Resources>::Layout;
 
-pub struct FinalizeMatching {
+pub struct CompactCoarseEdges {
     device: Device,
     bind_group_layout: BindGroupLayout<ResourcesLayout>,
     pipeline: ComputePipeline<(ResourcesLayout,)>,
 }
 
-impl FinalizeMatching {
+impl CompactCoarseEdges {
     pub fn init(device: Device) -> Self {
         let shader = device.create_shader_module(&SHADER);
 
@@ -42,7 +46,7 @@ impl FinalizeMatching {
                 .finish(),
         );
 
-        FinalizeMatching {
+        CompactCoarseEdges {
             device,
             bind_group_layout,
             pipeline,
@@ -52,7 +56,7 @@ impl FinalizeMatching {
     pub fn encode<U>(
         &self,
         encoder: CommandEncoder,
-        resources: FinalizeMatchingResources,
+        resources: CompactCoarseEdgesResources,
         dispatch_indirect: bool,
         dispatch: buffer::View<DispatchWorkgroups, U>,
         fallback_count: u32,
@@ -74,7 +78,7 @@ impl FinalizeMatching {
         } else {
             encoder
                 .dispatch_workgroups(DispatchWorkgroups {
-                    count_x: fallback_count.div_ceil(GROUP_SIZE),
+                    count_x: fallback_count.div_ceil(DEFAULT_GROUP_SIZE),
                     count_y: 1,
                     count_z: 1,
                 })
