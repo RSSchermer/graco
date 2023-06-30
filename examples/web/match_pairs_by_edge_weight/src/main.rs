@@ -2,7 +2,7 @@ use std::convert::TryInto;
 use std::error::Error;
 
 use arwa::dom::{selector, ParentNode};
-use arwa::html::HtmlCanvasElement;
+use arwa::html::{HtmlCanvasElement, HtmlInputElement};
 use arwa::window::window;
 use empa::arwa::{
     AlphaMode, CanvasConfiguration, HtmlCanvasElementExt, NavigatorExt, RequestAdapterOptions,
@@ -11,12 +11,14 @@ use empa::buffer::Buffer;
 use empa::device::DeviceDescriptor;
 use empa::texture::format::rgba8unorm;
 use empa::{abi, buffer, texture};
-use futures::FutureExt;
+use futures::{FutureExt, StreamExt};
 use graco::matching::{
     MatchPairsByEdgeWeight, MatchPairsByEdgeWeightConfig, MatchPairsByEdgeWeightInput,
     MatchPairsByEdgeWeightsCounts,
 };
 use web_viewer::{GraphRenderer, GraphRendererInput};
+use std::str::FromStr;
+use arwa::ui::UiEventTarget;
 
 struct GraphState {
     nodes_edge_offset: Vec<u32>,
@@ -146,16 +148,7 @@ async fn render() -> Result<(), Box<dyn Error>> {
         nodes_edge_weights,
     } = generate_regular_graph_state(50, 0.45);
 
-    let mut matcher = MatchPairsByEdgeWeight::init(
-        device.clone(),
-        MatchPairsByEdgeWeightConfig {
-            rounds: 8,
-            prng_seed: 1,
-        },
-    );
     let renderer = GraphRenderer::init(device.clone());
-
-    let mut encoder = device.create_command_encoder();
 
     let nodes_edge_offset: Buffer<[u32], _> =
         device.create_buffer(nodes_edge_offset, buffer::Usages::storage_binding());
@@ -179,34 +172,59 @@ async fn render() -> Result<(), Box<dyn Error>> {
     let edge_ref_count =
         device.create_buffer(nodes_edges.len() as u32, buffer::Usages::uniform_binding());
 
-    encoder = matcher.encode(
-        encoder,
-        MatchPairsByEdgeWeightInput {
-            nodes_edge_offset: nodes_edge_offset.view(),
-            nodes_edges: nodes_edges.view(),
-            nodes_edge_weights: nodes_edge_weights.view(),
-            count: Some(MatchPairsByEdgeWeightsCounts {
-                node_count: node_count.uniform(),
-                edge_ref_count: edge_ref_count.uniform(),
-            }),
-        },
-        nodes_matching.view(),
-    );
+    let rounds_input: HtmlInputElement = window.document().query_selector(&selector!("#rounds")).ok_or("rounds input not found")?.try_into()?;
 
-    encoder = renderer.encode(
-        encoder,
-        GraphRendererInput {
-            output_texture: &context.get_current_texture(),
-            node_count: node_count.view(),
-            edge_ref_count: edge_ref_count.view(),
-            nodes_edge_offset: nodes_edge_offset.view(),
-            nodes_edges: nodes_edges.view(),
-            nodes_matching: nodes_matching.view(),
-            nodes_position: nodes_position.view(),
-        },
-    );
+    let match_and_render = || {
+        let rounds = usize::from_str(&rounds_input.value()).unwrap();
 
-    device.queue().submit(encoder.finish());
+        let mut matcher = MatchPairsByEdgeWeight::init(
+            device.clone(),
+            MatchPairsByEdgeWeightConfig {
+                rounds,
+                prng_seed: 1,
+            },
+        );
+
+        let mut encoder = device.create_command_encoder();
+
+        encoder = matcher.encode(
+            encoder,
+            MatchPairsByEdgeWeightInput {
+                nodes_edge_offset: nodes_edge_offset.view(),
+                nodes_edges: nodes_edges.view(),
+                nodes_edge_weights: nodes_edge_weights.view(),
+                count: Some(MatchPairsByEdgeWeightsCounts {
+                    node_count: node_count.uniform(),
+                    edge_ref_count: edge_ref_count.uniform(),
+                }),
+            },
+            nodes_matching.view(),
+        );
+
+        encoder = renderer.encode(
+            encoder,
+            GraphRendererInput {
+                output_texture: &context.get_current_texture(),
+                node_count: node_count.view(),
+                edge_ref_count: edge_ref_count.view(),
+                nodes_edge_offset: nodes_edge_offset.view(),
+                nodes_edges: nodes_edges.view(),
+                nodes_matching: nodes_matching.view(),
+                nodes_position: nodes_position.view(),
+            },
+        );
+
+        device.queue().submit(encoder.finish());
+    };
+
+    match_and_render();
+
+    let match_button = window.document().query_selector(&selector!("#match_button")).ok_or("match button not found")?;
+    let mut match_clicks = match_button.on_click();
+
+    while let Some(_) = match_clicks.next().await {
+        match_and_render();
+    }
 
     Ok(())
 }
