@@ -2,9 +2,7 @@ use std::convert::TryInto;
 use std::error::Error;
 
 use arwa::dom::{selector, ParentNode};
-use arwa::fetch::{FetchContext, Request};
 use arwa::html::HtmlCanvasElement;
-use arwa::url::Url;
 use arwa::window::window;
 use empa::arwa::{
     AlphaMode, CanvasConfiguration, HtmlCanvasElementExt, NavigatorExt, RequestAdapterOptions,
@@ -18,7 +16,6 @@ use graco::matching::{
     MatchPairsByEdgeWeight, MatchPairsByEdgeWeightConfig, MatchPairsByEdgeWeightInput,
     MatchPairsByEdgeWeightsCounts,
 };
-use graph_loading::GraphData;
 use web_viewer::{GraphRenderer, GraphRendererInput};
 
 struct GraphState {
@@ -31,62 +28,6 @@ struct GraphState {
 fn main() {
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
     arwa::spawn_local(render().map(|res| res.unwrap()));
-}
-
-async fn load_graph_state_from_file(filename: &str) -> Result<GraphState, Box<dyn Error>> {
-    let url = Url::parse_with_base(filename, &window().location().to_url())?;
-    let graph_response = window()
-        .fetch(&Request::init(&url, Default::default()))
-        .await?;
-    let graph_src = graph_response.body().to_string().await?;
-    let GraphData {
-        nodes_edge_offset,
-        nodes_edges,
-    } = graph_loading::parse_graph_data(&graph_src).ok_or("invalid graph data")?;
-
-    let node_count = nodes_edge_offset.len();
-
-    let mut nodes_position = Vec::with_capacity(node_count);
-    let mut rng = oorandom::Rand32::new(7);
-
-    for _ in 0..node_count {
-        nodes_position.push(abi::Vec2(rng.rand_float(), rng.rand_float()));
-    }
-
-    let mut nodes_edge_weights = vec![0; nodes_edges.len()];
-
-    for i in 0..node_count {
-        let edges_start = nodes_edge_offset[i];
-
-        let edges_end = if i < node_count - 1 {
-            nodes_edge_offset[i + 1]
-        } else {
-            nodes_edges.len() as u32
-        };
-
-        let pos_a = nodes_position[i];
-
-        for j in edges_start..edges_end {
-            let other_index = nodes_edges[j as usize];
-
-            let pos_b = nodes_position[other_index as usize];
-
-            let d_x = pos_b.0 - pos_a.0;
-            let d_y = pos_b.1 - pos_a.1;
-
-            let weight = (d_x * d_x + d_y * d_y).sqrt();
-            let weight_inv = 1.0 / weight;
-
-            nodes_edge_weights[j as usize] = (weight_inv * 1000.0) as u32;
-        }
-    }
-
-    Ok(GraphState {
-        nodes_edge_offset,
-        nodes_position,
-        nodes_edges,
-        nodes_edge_weights,
-    })
 }
 
 fn generate_regular_graph_state(grid_size: u32, perturbation_factor: f32) -> GraphState {

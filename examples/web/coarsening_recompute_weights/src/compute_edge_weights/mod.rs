@@ -80,7 +80,12 @@ impl ComputeEdgeWeights {
         U5: buffer::StorageBinding,
     {
         let ComputeEdgeWeightsInput {
-            node_count, edge_ref_count, nodes_edge_offset, nodes_edges, nodes_position, nodes_edge_weights
+            node_count,
+            edge_ref_count,
+            nodes_edge_offset,
+            nodes_edges,
+            nodes_position,
+            nodes_edge_weights,
         } = input;
 
         let workgroups = (nodes_edge_offset.len() as u32).div_ceil(GROUPS_SIZE);
@@ -93,7 +98,7 @@ impl ComputeEdgeWeights {
                 nodes_edge_offset: nodes_edge_offset.read_only_storage(),
                 nodes_edges: nodes_edges.read_only_storage(),
                 nodes_position: nodes_position.read_only_storage(),
-                nodes_edge_weights: nodes_edge_weights.storage()
+                nodes_edge_weights: nodes_edge_weights.storage(),
             },
         );
 

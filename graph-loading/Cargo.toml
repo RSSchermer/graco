@@ -1,6 +1,0 @@
-[package]
-name = "graph-loading"
-version = "0.1.0"
-authors = ["RSSchermer <roland0507@gmail.com>"]
-edition = "2021"
-publish = false

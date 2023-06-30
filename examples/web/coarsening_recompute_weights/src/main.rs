@@ -8,10 +8,8 @@ use std::error::Error;
 use std::mem;
 
 use arwa::dom::{selector, ParentNode};
-use arwa::fetch::{FetchContext, Request};
 use arwa::html::HtmlCanvasElement;
 use arwa::ui::UiEventTarget;
-use arwa::url::Url;
 use arwa::window::window;
 use empa::arwa::{
     AlphaMode, CanvasConfiguration, HtmlCanvasElementExt, NavigatorExt, RequestAdapterOptions,
@@ -26,7 +24,6 @@ use graco::matching::{
     MatchPairsByEdgeWeight, MatchPairsByEdgeWeightInput, MatchPairsByEdgeWeightsCounts,
 };
 use graco::{CoarsenCounts, CoarsenGraph, CoarsenGraphInput, CoarsenGraphOutput};
-use graph_loading::GraphData;
 use web_viewer::{GraphRenderer, GraphRendererInput};
 
 use crate::compute_child_level_positions::{
@@ -392,8 +389,8 @@ async fn render() -> Result<(), Box<dyn Error>> {
                 nodes_edge_offset: child_level.nodes_edge_offset.view(),
                 nodes_edges: child_level.nodes_edges.view(),
                 nodes_position: child_level.nodes_position.view(),
-                nodes_edge_weights: child_level.nodes_edge_weights.view()
-            }
+                nodes_edge_weights: child_level.nodes_edge_weights.view(),
+            },
         );
 
         encoder = encoder.clear_buffer_slice(nodes_matching.view());

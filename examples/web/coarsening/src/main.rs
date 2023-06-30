@@ -7,10 +7,8 @@ use std::error::Error;
 use std::mem;
 
 use arwa::dom::{selector, ParentNode};
-use arwa::fetch::{FetchContext, Request};
 use arwa::html::HtmlCanvasElement;
 use arwa::ui::UiEventTarget;
-use arwa::url::Url;
 use arwa::window::window;
 use empa::arwa::{
     AlphaMode, CanvasConfiguration, HtmlCanvasElementExt, NavigatorExt, RequestAdapterOptions,
@@ -25,7 +23,6 @@ use graco::matching::{
     MatchPairsByEdgeWeight, MatchPairsByEdgeWeightInput, MatchPairsByEdgeWeightsCounts,
 };
 use graco::{CoarsenCounts, CoarsenGraph, CoarsenGraphInput, CoarsenGraphOutput};
-use graph_loading::GraphData;
 use web_viewer::{GraphRenderer, GraphRendererInput};
 
 use crate::compute_child_level_positions::{
