@@ -244,9 +244,6 @@ impl CoarsenGraph {
             },
         );
 
-        // We don't need `coarse_nodes_edge_offset` yet, so use it to store the run_mapping for now.
-        // Since we no longer need the "run mapping" by the time we actually want to store the
-        // coarse node edges, this works out perfectly.
         let run_mapping = temporary_storage_0;
 
         encoder = self.find_runs.encode(
@@ -514,9 +511,7 @@ impl CoarsenGraph {
 
         // Compute the final `coarse_nodes_edge_weights` by (atomically) adding together the
         // weights for the mapped edges to the index provided by the validity prefix-sum, except
-        // if edge is marked as invalid due to self-referencing. As noted earlier, WebGPU does not
-        // yet support `f32` atomics, so we'll using a looping compare-and-swap strategy to
-        // emulate `f32` atomics with `u32` atomics.
+        // if edge is marked as invalid due to self-referencing.
         encoder = encoder.clear_buffer_slice(storage_0);
         encoder = self.collect_coarse_nodes_edge_weights.encode(
             encoder,
