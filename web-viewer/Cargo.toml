@@ -7,7 +7,7 @@ publish = false
 
 [dependencies]
 arwa = { version = "0.1.1", path = "../../rudo/arwa" }
-empa = { path = "../../glitz/empa" }
+bytemuck = { version = "1.14.0", features = ["derive"] }
+empa = { path = "../../glitz/empa", features = ["bytemuck"] }
 empa-glam = { version = "0.1.0", path = "../../glitz/empa_glam" }
 glam = "^0.24"
-zeroable = { path = "../../zeroable_crates/zeroable" }

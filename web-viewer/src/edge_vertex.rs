@@ -1,6 +1,6 @@
 use empa::abi;
 use empa::render_pipeline::Vertex;
-use zeroable::Zeroable;
+use bytemuck::Zeroable;
 
 #[derive(Vertex, abi::Sized, Clone, Copy, Zeroable, Debug)]
 pub struct EdgeVertex {
