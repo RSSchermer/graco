@@ -82,7 +82,7 @@ impl MatchPairsByEdgeWeight {
         let find_matches = FindMatches::init(device.clone());
         let finalize_matching = FinalizeMatching::init(device.clone());
 
-        let mut rng = oorandom::Rand32::new(1);
+        let mut rng = oorandom::Rand32::new(config.prng_seed as u64);
         let mut prng_seeds = Vec::with_capacity(config.rounds);
 
         for _ in 0..config.rounds {

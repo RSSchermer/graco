@@ -68,10 +68,15 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
         }
 
         if has_match_candidate {
-            // We know `best_match_weight` is a strictly positive number, that is not NaN and not infinity, so we
-            // should be able to get the equivalent of atomic max with floating point values by casting to an unsigned
-            // integer.
             atomicMax(&nodes_proposal[best_candidate_index], best_candidate_weight);
+
+            // Also associate the index for the best candidate with this current node, to record that this node indeed
+            // proposed to the candidate note. As there is never overlap between the set of proposing nodes ("blue"
+            // nodes) with the set of proposed to nodes ("red nodes"), we can reuse the `nodes_proposal` buffer for this
+            // purpose.
+            //
+            // Note that if/when WebGPU permits, this need not be an atomic operation.
+            atomicStore(&nodes_proposal[index], best_candidate_index);
         }
 
         if !has_live_neighbour {

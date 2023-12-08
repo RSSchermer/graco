@@ -14,9 +14,9 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
         return;
     }
 
-    let state = nodes_match_state[index];
-    let status = state >> 30;
-    let match_index = state & 0x3FFFFFFF;
+    let state = MatchState(nodes_match_state[index]);
+    let status = match_state_status(state);
+    let match_index = match_state_match_index(state);
 
     var match_value = index;
 
