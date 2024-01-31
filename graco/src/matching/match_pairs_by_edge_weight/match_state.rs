@@ -1,7 +1,7 @@
 use std::fmt;
 
-use empa::abi;
 use bytemuck::Zeroable;
+use empa::abi;
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 #[repr(u32)]

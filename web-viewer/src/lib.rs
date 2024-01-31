@@ -1,4 +1,4 @@
-#![feature(int_roundings)]
+#![feature(future_join, int_roundings)]
 
 mod draw_edge_lines;
 mod draw_point_triangles;

@@ -34,31 +34,33 @@ pub struct DrawEdgeLines {
 }
 
 impl DrawEdgeLines {
-    pub fn init(device: Device) -> Self {
+    pub async fn init(device: Device) -> Self {
         let shader = device.create_shader_module(&SHADER);
 
         let bind_group_layout = device.create_bind_group_layout::<ResourcesLayout>();
         let pipeline_layout = device.create_pipeline_layout(&bind_group_layout);
 
-        let pipeline = device.create_render_pipeline(
-            &RenderPipelineDescriptorBuilder::begin()
-                .layout(&pipeline_layout)
-                .vertex(
-                    &VertexStageBuilder::begin(&shader, "vert_main")
-                        .vertex_layout::<EdgeVertex>()
-                        .finish(),
-                )
-                .fragment(
-                    &FragmentStageBuilder::begin(&shader, "frag_main")
-                        .color_outputs(ColorOutput {
-                            format: rgba8unorm,
-                            write_mask: ColorWriteMask::ALL,
-                        })
-                        .finish(),
-                )
-                .primitive_assembly(PrimitiveAssembly::line_list())
-                .finish(),
-        );
+        let pipeline = device
+            .create_render_pipeline(
+                &RenderPipelineDescriptorBuilder::begin()
+                    .layout(&pipeline_layout)
+                    .vertex(
+                        &VertexStageBuilder::begin(&shader, "vert_main")
+                            .vertex_layout::<EdgeVertex>()
+                            .finish(),
+                    )
+                    .fragment(
+                        &FragmentStageBuilder::begin(&shader, "frag_main")
+                            .color_outputs(ColorOutput {
+                                format: rgba8unorm,
+                                write_mask: ColorWriteMask::ALL,
+                            })
+                            .finish(),
+                    )
+                    .primitive_assembly(PrimitiveAssembly::line_list())
+                    .finish(),
+            )
+            .await;
 
         DrawEdgeLines {
             device,

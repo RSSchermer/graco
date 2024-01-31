@@ -1,6 +1,7 @@
-#![feature(int_roundings)]
+#![feature(future_join, int_roundings)]
 
 use std::error::Error;
+use std::future::join;
 
 use arwa::window::window;
 use empa::adapter::Features;
@@ -223,8 +224,11 @@ async fn render() -> Result<(), Box<dyn Error>> {
         })
         .await?;
 
-    let mut matcher = MatchPairsByEdgeWeight::init(device.clone(), Default::default());
-    let mut coarsen_graph = CoarsenGraph::init(device.clone());
+    let (mut matcher, mut coarsen_graph) = join!(
+        MatchPairsByEdgeWeight::init(device.clone(), Default::default()),
+        CoarsenGraph::init(device.clone()),
+    )
+    .await;
 
     let graph_state = generate_regular_graph_state(grid_size, 0.45);
     let parent_level = GraphLevel::from_data(&device, &graph_state);

@@ -1,10 +1,11 @@
-#![feature(int_roundings)]
+#![feature(future_join, int_roundings)]
 
 mod compute_child_level_positions;
 mod compute_edge_weights;
 
 use std::convert::TryInto;
 use std::error::Error;
+use std::future::join;
 use std::mem;
 
 use arwa::dom::{selector, ParentNode};
@@ -254,11 +255,20 @@ async fn render() -> Result<(), Box<dyn Error>> {
         alpha_mode: AlphaMode::Opaque,
     });
 
-    let mut matcher = MatchPairsByEdgeWeight::init(device.clone(), Default::default());
-    let mut coarsen_graph = CoarsenGraph::init(device.clone());
-    let compute_child_level_positions = ComputeChildLevelPositions::init(device.clone());
-    let compute_edge_weights = ComputeEdgeWeights::init(device.clone());
-    let renderer = GraphRenderer::init(device.clone());
+    let (
+        mut matcher,
+        mut coarsen_graph,
+        compute_child_level_positions,
+        compute_edge_weights,
+        renderer,
+    ) = join!(
+        MatchPairsByEdgeWeight::init(device.clone(), Default::default()),
+        CoarsenGraph::init(device.clone()),
+        ComputeChildLevelPositions::init(device.clone()),
+        ComputeEdgeWeights::init(device.clone()),
+        GraphRenderer::init(device.clone()),
+    )
+    .await;
 
     let graph_state = generate_regular_graph_state(256, 0.45);
     let base_level = GraphLevel::from_data(&device, &graph_state);

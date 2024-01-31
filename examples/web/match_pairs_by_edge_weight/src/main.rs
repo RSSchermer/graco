@@ -1,8 +1,12 @@
+#![feature(async_closure)]
+
 use std::convert::TryInto;
 use std::error::Error;
+use std::str::FromStr;
 
 use arwa::dom::{selector, ParentNode};
 use arwa::html::{HtmlCanvasElement, HtmlInputElement};
+use arwa::ui::UiEventTarget;
 use arwa::window::window;
 use empa::arwa::{
     AlphaMode, CanvasConfiguration, HtmlCanvasElementExt, NavigatorExt, RequestAdapterOptions,
@@ -17,8 +21,6 @@ use graco::matching::{
     MatchPairsByEdgeWeightsCounts,
 };
 use web_viewer::{GraphRenderer, GraphRendererInput};
-use std::str::FromStr;
-use arwa::ui::UiEventTarget;
 
 struct GraphState {
     nodes_edge_offset: Vec<u32>,
@@ -148,7 +150,7 @@ async fn render() -> Result<(), Box<dyn Error>> {
         nodes_edge_weights,
     } = generate_regular_graph_state(50, 0.45);
 
-    let renderer = GraphRenderer::init(device.clone());
+    let renderer = GraphRenderer::init(device.clone()).await;
 
     let nodes_edge_offset: Buffer<[u32], _> =
         device.create_buffer(nodes_edge_offset, buffer::Usages::storage_binding());
@@ -172,9 +174,13 @@ async fn render() -> Result<(), Box<dyn Error>> {
     let edge_ref_count =
         device.create_buffer(nodes_edges.len() as u32, buffer::Usages::uniform_binding());
 
-    let rounds_input: HtmlInputElement = window.document().query_selector(&selector!("#rounds")).ok_or("rounds input not found")?.try_into()?;
+    let rounds_input: HtmlInputElement = window
+        .document()
+        .query_selector(&selector!("#rounds"))
+        .ok_or("rounds input not found")?
+        .try_into()?;
 
-    let match_and_render = || {
+    let match_and_render = async || {
         let rounds = usize::from_str(&rounds_input.value()).unwrap();
 
         let mut matcher = MatchPairsByEdgeWeight::init(
@@ -183,7 +189,8 @@ async fn render() -> Result<(), Box<dyn Error>> {
                 rounds,
                 prng_seed: 1,
             },
-        );
+        )
+        .await;
 
         let mut encoder = device.create_command_encoder();
 
@@ -217,13 +224,16 @@ async fn render() -> Result<(), Box<dyn Error>> {
         device.queue().submit(encoder.finish());
     };
 
-    match_and_render();
+    match_and_render().await;
 
-    let match_button = window.document().query_selector(&selector!("#match_button")).ok_or("match button not found")?;
+    let match_button = window
+        .document()
+        .query_selector(&selector!("#match_button"))
+        .ok_or("match button not found")?;
     let mut match_clicks = match_button.on_click();
 
     while let Some(_) = match_clicks.next().await {
-        match_and_render();
+        match_and_render().await;
     }
 
     Ok(())

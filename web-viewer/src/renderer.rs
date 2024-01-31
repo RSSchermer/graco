@@ -1,3 +1,5 @@
+use std::future::join;
+
 use empa::buffer::Buffer;
 use empa::command::{CommandEncoder, Draw, DrawIndexed, RenderPassDescriptor};
 use empa::device::Device;
@@ -38,11 +40,20 @@ pub struct GraphRenderer {
 }
 
 impl GraphRenderer {
-    pub fn init(device: Device) -> Self {
-        let generate_dispatches = GenerateDispatches::init(device.clone());
-        let generate_edge_line_vertices = GenerateEdgeLineVertices::init(device.clone());
-        let draw_point_triangles = DrawPointTriangles::init(device.clone());
-        let draw_edge_lines = DrawEdgeLines::init(device.clone());
+    pub async fn init(device: Device) -> Self {
+        let (
+            generate_dispatches,
+            generate_edge_line_vertices,
+            draw_point_triangles,
+            draw_edge_lines,
+        ) = join!(
+            GenerateDispatches::init(device.clone()),
+            GenerateEdgeLineVertices::init(device.clone()),
+            DrawPointTriangles::init(device.clone()),
+            DrawEdgeLines::init(device.clone()),
+        )
+        .await;
+
         let triangle_index_count =
             device.create_buffer(INDICES_PER_POINT as u32, buffer::Usages::uniform_binding());
         let draw_point_triangles_dispatch = device.create_buffer(

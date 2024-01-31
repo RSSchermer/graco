@@ -1,3 +1,4 @@
+use std::future::join;
 use std::mem;
 
 use empa::buffer;
@@ -75,12 +76,21 @@ pub struct MatchPairsByEdgeWeight {
 }
 
 impl MatchPairsByEdgeWeight {
-    pub fn init(device: Device, config: MatchPairsByEdgeWeightConfig) -> Self {
-        let generate_dispatch = GenerateDispatch::init(device.clone());
-        let assign_node_colors = AssignNodeColors::init(device.clone());
-        let make_proposals = MakeProposals::init(device.clone());
-        let find_matches = FindMatches::init(device.clone());
-        let finalize_matching = FinalizeMatching::init(device.clone());
+    pub async fn init(device: Device, config: MatchPairsByEdgeWeightConfig) -> Self {
+        let (
+            generate_dispatch,
+            assign_node_colors,
+            make_proposals,
+            find_matches,
+            finalize_matching,
+        ) = join!(
+            GenerateDispatch::init(device.clone()),
+            AssignNodeColors::init(device.clone()),
+            MakeProposals::init(device.clone()),
+            FindMatches::init(device.clone()),
+            FinalizeMatching::init(device.clone()),
+        )
+        .await;
 
         let mut rng = oorandom::Rand32::new(config.prng_seed as u64);
         let mut prng_seeds = Vec::with_capacity(config.rounds);

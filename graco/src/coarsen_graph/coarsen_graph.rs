@@ -1,3 +1,5 @@
+use std::future::join;
+
 use empa::buffer;
 use empa::buffer::{Buffer, Uniform};
 use empa::command::{CommandEncoder, DispatchWorkgroups};
@@ -77,20 +79,38 @@ pub struct CoarsenGraph {
 }
 
 impl CoarsenGraph {
-    pub fn init(device: Device) -> Self {
-        let generate_dispatches = GenerateDispatches::init(device.clone());
-        let generate_index_list = GenerateIndexList::init(device.clone());
-        let gather_edge_owner_list = GatherEdgeOwnerList::init(device.clone());
-        let mark_coarse_edge_validity = MarkCoarseEdgeValidity::init(device.clone());
-        let collect_coarse_nodes_edge_weights = CollectCoarseNodesEdgeWeights::init(device.clone());
-        let compact_coarse_edges = CompactCoarseEdges::init(device.clone());
-        let resolve_coarse_edge_ref_count = ResolveCoarseEdgeRefCount::init(device.clone());
-        let finalize_coarse_nodes_edge_offset = FinalizeCoarseNodesEdgeOffset::init(device.clone());
-        let sort_by = RadixSortBy::init_u32(device.clone());
-        let find_runs = FindRuns::init_u32(device.clone());
-        let scatter_by = ScatterBy::init_u32(device.clone());
-        let gather_by = GatherBy::init_u32(device.clone());
-        let prefix_sum_inclusive = PrefixSum::init_inclusive_u32(device.clone());
+    pub async fn init(device: Device) -> Self {
+        let (
+            generate_dispatches,
+            generate_index_list,
+            gather_edge_owner_list,
+            mark_coarse_edge_validity,
+            collect_coarse_nodes_edge_weights,
+            compact_coarse_edges,
+            resolve_coarse_edge_ref_count,
+            finalize_coarse_nodes_edge_offset,
+            sort_by,
+            find_runs,
+            scatter_by,
+            gather_by,
+            prefix_sum_inclusive,
+        ) = join!(
+            GenerateDispatches::init(device.clone()),
+            GenerateIndexList::init(device.clone()),
+            GatherEdgeOwnerList::init(device.clone()),
+            MarkCoarseEdgeValidity::init(device.clone()),
+            CollectCoarseNodesEdgeWeights::init(device.clone()),
+            CompactCoarseEdges::init(device.clone()),
+            ResolveCoarseEdgeRefCount::init(device.clone()),
+            FinalizeCoarseNodesEdgeOffset::init(device.clone()),
+            RadixSortBy::init_u32(device.clone()),
+            FindRuns::init_u32(device.clone()),
+            ScatterBy::init_u32(device.clone()),
+            GatherBy::init_u32(device.clone()),
+            PrefixSum::init_inclusive_u32(device.clone()),
+        )
+        .await;
+
         let group_size =
             device.create_buffer(DEFAULT_GROUP_SIZE, buffer::Usages::uniform_binding());
         let node_count_dispatch = device.create_buffer(

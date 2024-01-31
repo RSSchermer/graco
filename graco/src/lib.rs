@@ -1,4 +1,4 @@
-#![feature(int_roundings)]
+#![feature(future_join, int_roundings)]
 
 pub mod matching;
 
