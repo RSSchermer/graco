@@ -260,7 +260,7 @@ impl CoarsenGraph {
                 values: coarse_nodes_mapping,
                 temporary_key_storage: temporary_storage_0,
                 temporary_value_storage: temporary_storage_1,
-                count: counts.as_ref().map(|c| c.node_count.clone()),
+                count: Some(node_count.clone()),
             },
         );
 
@@ -270,7 +270,7 @@ impl CoarsenGraph {
             encoder,
             FindRunsInput {
                 data: fine_nodes_matching,
-                count: counts.as_ref().map(|c| c.node_count.clone()),
+                count: Some(node_count.clone()),
             },
             FindRunsOutput {
                 run_count: coarse_node_count,
@@ -284,7 +284,7 @@ impl CoarsenGraph {
             ScatterByInput {
                 scatter_by: coarse_nodes_mapping,
                 data: run_mapping,
-                count: counts.as_ref().map(|c| c.node_count.clone()),
+                count: Some(node_count.clone()),
             },
             fine_nodes_mapping,
         );
@@ -315,7 +315,7 @@ impl CoarsenGraph {
             GatherByInput {
                 gather_by: fine_nodes_edges,
                 data: fine_nodes_mapping,
-                count: counts.as_ref().map(|c| c.edge_ref_count.clone()),
+                count: Some(edge_ref_count.clone()),
             },
             storage_0,
         );
@@ -344,7 +344,7 @@ impl CoarsenGraph {
                 values: storage_1,
                 temporary_key_storage: storage_2,
                 temporary_value_storage: storage_3,
-                count: counts.as_ref().map(|c| c.edge_ref_count.clone()),
+                count: Some(edge_ref_count.clone()),
             },
         );
 
@@ -372,7 +372,7 @@ impl CoarsenGraph {
             GatherByInput {
                 gather_by: storage_1,
                 data: storage_2,
-                count: counts.as_ref().map(|c| c.edge_ref_count.clone()),
+                count: Some(edge_ref_count.clone()),
             },
             storage_0,
         );
@@ -387,7 +387,7 @@ impl CoarsenGraph {
                 values: storage_1,
                 temporary_key_storage: storage_2,
                 temporary_value_storage: storage_3,
-                count: counts.as_ref().map(|c| c.edge_ref_count.clone()),
+                count: Some(edge_ref_count.clone()),
             },
         );
 
@@ -398,7 +398,7 @@ impl CoarsenGraph {
             GatherByInput {
                 gather_by: fine_nodes_edges,
                 data: fine_nodes_mapping,
-                count: counts.as_ref().map(|c| c.edge_ref_count.clone()),
+                count: Some(edge_ref_count.clone()),
             },
             storage_2,
         );
@@ -411,7 +411,7 @@ impl CoarsenGraph {
             GatherByInput {
                 gather_by: storage_1,
                 data: storage_2,
-                count: counts.as_ref().map(|c| c.edge_ref_count.clone()),
+                count: Some(edge_ref_count.clone()),
             },
             storage_3,
         );
@@ -424,7 +424,7 @@ impl CoarsenGraph {
             GatherByInput {
                 gather_by: storage_1,
                 data: fine_nodes_edge_weights,
-                count: counts.as_ref().map(|c| c.edge_ref_count.clone()),
+                count: Some(edge_ref_count.clone()),
             },
             storage_2,
         );
@@ -477,7 +477,7 @@ impl CoarsenGraph {
             encoder,
             FindRunsInput {
                 data: storage_0,
-                count: counts.as_ref().map(|c| c.edge_ref_count.clone()),
+                count: Some(edge_ref_count.clone()),
             },
             FindRunsOutput {
                 run_count: coarse_node_count,
@@ -525,7 +525,7 @@ impl CoarsenGraph {
             encoder,
             PrefixSumInput {
                 data: storage_1,
-                count: counts.as_ref().map(|c| c.edge_ref_count.clone()),
+                count: Some(edge_ref_count.clone()),
             },
         );
 
