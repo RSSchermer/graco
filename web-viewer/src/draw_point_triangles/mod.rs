@@ -1,13 +1,13 @@
 use std::ops::Rem;
 
-use empa::buffer::{Buffer, ReadOnlyStorage, Uniform};
+use empa::buffer::{Buffer, Storage, Uniform};
 use empa::command::{
     DrawIndexed, DrawIndexedCommandEncoder, RenderBundle, RenderBundleEncoderDescriptor,
     RenderStateEncoder, ResourceBindingCommandEncoder,
 };
 use empa::device::Device;
 use empa::render_pipeline::{
-    ColorOutput, ColorWriteMask, FragmentStageBuilder, IndexAny, RenderPipeline,
+    ColorOutput, ColorWrite, FragmentStageBuilder, IndexAny, PrimitiveAssembly, RenderPipeline,
     RenderPipelineDescriptorBuilder, Vertex, VertexStageBuilder,
 };
 use empa::render_target::RenderLayout;
@@ -30,14 +30,14 @@ pub struct TriangleVertex {
 }
 
 #[derive(empa::resource_binding::Resources)]
-struct Resources {
-    #[resource(binding = 0, visibility = "VERTEX")]
-    transform: Uniform<abi::Mat3x3>,
-    #[resource(binding = 1, visibility = "VERTEX")]
-    nodes_position: ReadOnlyStorage<[abi::Vec2<f32>]>,
+struct Resources<'a> {
+    #[resource(binding = 0, visibility = "VERTEX | FRAGMENT")]
+    transform: Uniform<'a, abi::Mat3x3>,
+    #[resource(binding = 1, visibility = "VERTEX | FRAGMENT")]
+    nodes_position: Storage<'a, [abi::Vec2<f32>]>,
 }
 
-type ResourcesLayout = <Resources as empa::resource_binding::Resources>::Layout;
+type ResourcesLayout = <Resources<'static> as empa::resource_binding::Resources>::Layout;
 
 pub struct DrawPointTriangles {
     device: Device,
@@ -60,18 +60,19 @@ impl DrawPointTriangles {
                 &RenderPipelineDescriptorBuilder::begin()
                     .layout(&pipeline_layout)
                     .vertex(
-                        &VertexStageBuilder::begin(&shader, "vert_main")
+                        VertexStageBuilder::begin(&shader, "vert_main")
                             .vertex_layout::<TriangleVertex>()
                             .finish(),
                     )
                     .fragment(
-                        &FragmentStageBuilder::begin(&shader, "frag_main")
+                        FragmentStageBuilder::begin(&shader, "frag_main")
                             .color_outputs(ColorOutput {
                                 format: rgba8unorm,
-                                write_mask: ColorWriteMask::ALL,
+                                write_mask: ColorWrite::All,
                             })
                             .finish(),
                     )
+                    .primitive_assembly(PrimitiveAssembly::triangle_list())
                     .finish(),
             )
             .await;
@@ -129,7 +130,7 @@ impl DrawPointTriangles {
             &self.bind_group_layout,
             Resources {
                 transform: transform.uniform(),
-                nodes_position: nodes_position.read_only_storage(),
+                nodes_position: nodes_position.storage(),
             },
         );
 

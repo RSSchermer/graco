@@ -1,4 +1,5 @@
-use empa::buffer::{ReadOnlyStorage, Storage, Uniform};
+use empa::access_mode::ReadWrite;
+use empa::buffer::{Storage, Uniform};
 use empa::command::{CommandEncoder, DispatchWorkgroups, ResourceBindingCommandEncoder};
 use empa::compute_pipeline::{
     ComputePipeline, ComputePipelineDescriptorBuilder, ComputeStageBuilder,
@@ -13,22 +14,22 @@ const GROUPS_SIZE: u32 = 256;
 const SHADER: ShaderSource = shader_source!("shader.wgsl");
 
 #[derive(empa::resource_binding::Resources)]
-struct Resources {
+struct Resources<'a> {
     #[resource(binding = 0, visibility = "COMPUTE")]
-    node_count: Uniform<u32>,
+    node_count: Uniform<'a, u32>,
     #[resource(binding = 1, visibility = "COMPUTE")]
-    edge_ref_count: Uniform<u32>,
+    edge_ref_count: Uniform<'a, u32>,
     #[resource(binding = 2, visibility = "COMPUTE")]
-    nodes_edge_offset: ReadOnlyStorage<[u32]>,
+    nodes_edge_offset: Storage<'a, [u32]>,
     #[resource(binding = 3, visibility = "COMPUTE")]
-    nodes_edges: ReadOnlyStorage<[u32]>,
+    nodes_edges: Storage<'a, [u32]>,
     #[resource(binding = 4, visibility = "COMPUTE")]
-    nodes_position: ReadOnlyStorage<[abi::Vec2<f32>]>,
+    nodes_position: Storage<'a, [abi::Vec2<f32>]>,
     #[resource(binding = 5, visibility = "COMPUTE")]
-    nodes_edge_weights: Storage<[u32]>,
+    nodes_edge_weights: Storage<'a, [u32], ReadWrite>,
 }
 
-type ResourcesLayout = <Resources as empa::resource_binding::Resources>::Layout;
+type ResourcesLayout = <Resources<'static> as empa::resource_binding::Resources>::Layout;
 
 pub struct ComputeEdgeWeightsInput<'a, U0, U1, U2, U3, U4, U5> {
     pub node_count: buffer::View<'a, u32, U0>,
@@ -56,7 +57,7 @@ impl ComputeEdgeWeights {
             .create_compute_pipeline(
                 &ComputePipelineDescriptorBuilder::begin()
                     .layout(&pipeline_layout)
-                    .compute(&ComputeStageBuilder::begin(&shader, "main").finish())
+                    .compute(ComputeStageBuilder::begin(&shader, "main").finish())
                     .finish(),
             )
             .await;
@@ -97,9 +98,9 @@ impl ComputeEdgeWeights {
             Resources {
                 node_count: node_count.uniform(),
                 edge_ref_count: edge_ref_count.uniform(),
-                nodes_edge_offset: nodes_edge_offset.read_only_storage(),
-                nodes_edges: nodes_edges.read_only_storage(),
-                nodes_position: nodes_position.read_only_storage(),
+                nodes_edge_offset: nodes_edge_offset.storage(),
+                nodes_edges: nodes_edges.storage(),
+                nodes_position: nodes_position.storage(),
                 nodes_edge_weights: nodes_edge_weights.storage(),
             },
         );

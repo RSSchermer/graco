@@ -1,5 +1,6 @@
+use empa::access_mode::ReadWrite;
 use empa::buffer;
-use empa::buffer::{ReadOnlyStorage, Storage, Uniform};
+use empa::buffer::{Storage, Uniform};
 use empa::command::{CommandEncoder, DispatchWorkgroups, ResourceBindingCommandEncoder};
 use empa::compute_pipeline::{
     ComputePipeline, ComputePipelineDescriptorBuilder, ComputeStageBuilder,
@@ -13,20 +14,21 @@ use crate::coarsen_graph::DEFAULT_GROUP_SIZE;
 const SHADER: ShaderSource = shader_source!("shader.wgsl");
 
 #[derive(empa::resource_binding::Resources)]
-pub struct GatherEdgeOwnerListResources {
+pub struct GatherEdgeOwnerListResources<'a> {
     #[resource(binding = 0, visibility = "COMPUTE")]
-    pub fine_node_count: Uniform<u32>,
+    pub fine_node_count: Uniform<'a, u32>,
     #[resource(binding = 1, visibility = "COMPUTE")]
-    pub fine_edge_count: Uniform<u32>,
+    pub fine_edge_count: Uniform<'a, u32>,
     #[resource(binding = 2, visibility = "COMPUTE")]
-    pub fine_nodes_edge_offset: ReadOnlyStorage<[u32]>,
+    pub fine_nodes_edge_offset: Storage<'a, [u32]>,
     #[resource(binding = 3, visibility = "COMPUTE")]
-    pub fine_nodes_mapping: ReadOnlyStorage<[u32]>,
+    pub fine_nodes_mapping: Storage<'a, [u32]>,
     #[resource(binding = 4, visibility = "COMPUTE")]
-    pub coarsened_edge_owner_list: Storage<[u32]>,
+    pub coarsened_edge_owner_list: Storage<'a, [u32], ReadWrite>,
 }
 
-type ResourcesLayout = <GatherEdgeOwnerListResources as empa::resource_binding::Resources>::Layout;
+type ResourcesLayout =
+    <GatherEdgeOwnerListResources<'static> as empa::resource_binding::Resources>::Layout;
 
 pub struct GatherEdgeOwnerList {
     device: Device,
@@ -45,7 +47,7 @@ impl GatherEdgeOwnerList {
             .create_compute_pipeline(
                 &ComputePipelineDescriptorBuilder::begin()
                     .layout(&pipeline_layout)
-                    .compute(&ComputeStageBuilder::begin(&shader, "main").finish())
+                    .compute(ComputeStageBuilder::begin(&shader, "main").finish())
                     .finish(),
             )
             .await;

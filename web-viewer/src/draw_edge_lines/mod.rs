@@ -5,7 +5,7 @@ use empa::command::{
 };
 use empa::device::Device;
 use empa::render_pipeline::{
-    ColorOutput, ColorWriteMask, FragmentStageBuilder, IndexAny, PrimitiveAssembly, RenderPipeline,
+    ColorOutput, ColorWrite, FragmentStageBuilder, IndexAny, PrimitiveAssembly, RenderPipeline,
     RenderPipelineDescriptorBuilder, VertexStageBuilder,
 };
 use empa::render_target::RenderLayout;
@@ -19,12 +19,12 @@ use crate::edge_vertex::EdgeVertex;
 const SHADER: ShaderSource = shader_source!("shader.wgsl");
 
 #[derive(empa::resource_binding::Resources)]
-struct Resources {
-    #[resource(binding = 0, visibility = "VERTEX")]
-    transform: Uniform<abi::Mat3x3>,
+struct Resources<'a> {
+    #[resource(binding = 0, visibility = "VERTEX | FRAGMENT")]
+    transform: Uniform<'a, abi::Mat3x3>,
 }
 
-type ResourcesLayout = <Resources as empa::resource_binding::Resources>::Layout;
+type ResourcesLayout = <Resources<'static> as empa::resource_binding::Resources>::Layout;
 
 pub struct DrawEdgeLines {
     device: Device,
@@ -45,15 +45,15 @@ impl DrawEdgeLines {
                 &RenderPipelineDescriptorBuilder::begin()
                     .layout(&pipeline_layout)
                     .vertex(
-                        &VertexStageBuilder::begin(&shader, "vert_main")
+                        VertexStageBuilder::begin(&shader, "vert_main")
                             .vertex_layout::<EdgeVertex>()
                             .finish(),
                     )
                     .fragment(
-                        &FragmentStageBuilder::begin(&shader, "frag_main")
+                        FragmentStageBuilder::begin(&shader, "frag_main")
                             .color_outputs(ColorOutput {
                                 format: rgba8unorm,
-                                write_mask: ColorWriteMask::ALL,
+                                write_mask: ColorWrite::All,
                             })
                             .finish(),
                     )

@@ -7,6 +7,7 @@ use empa::command::{CommandEncoder, DispatchWorkgroups};
 use empa::device::Device;
 use empa::type_flag::{O, X};
 
+use crate::counts_fallback::FallbackCounts;
 use crate::matching::match_pairs_by_edge_weight::assign_node_colors::{
     AssignNodeColors, AssignNodeColorsResources,
 };
@@ -48,16 +49,16 @@ impl Default for MatchPairsByEdgeWeightConfig {
     }
 }
 
-pub struct MatchPairsByEdgeWeightsCounts {
-    pub node_count: Uniform<u32>,
-    pub edge_ref_count: Uniform<u32>,
+pub struct MatchPairsByEdgeWeightsCounts<'a> {
+    pub node_count: Uniform<'a, u32>,
+    pub edge_ref_count: Uniform<'a, u32>,
 }
 
 pub struct MatchPairsByEdgeWeightInput<'a, U0, U1, U2> {
     pub nodes_edge_offset: buffer::View<'a, [u32], U0>,
     pub nodes_edges: buffer::View<'a, [u32], U1>,
     pub nodes_edge_weights: buffer::View<'a, [u32], U2>,
-    pub count: Option<MatchPairsByEdgeWeightsCounts>,
+    pub count: Option<MatchPairsByEdgeWeightsCounts<'a>>,
 }
 
 pub struct MatchPairsByEdgeWeight {
@@ -166,28 +167,18 @@ impl MatchPairsByEdgeWeight {
 
         let fallback_node_count = nodes_edge_offset.len() as u32;
         let fallback_edge_ref_count = nodes_edges.len() as u32;
-
-        let (node_count, edge_ref_count) = count
-            .map(|c| (c.node_count, c.edge_ref_count))
-            .unwrap_or_else(|| {
-                let node_count = self
-                    .device
-                    .create_buffer(fallback_node_count, buffer::Usages::uniform_binding())
-                    .uniform();
-                let edge_ref_count = self
-                    .device
-                    .create_buffer(fallback_edge_ref_count, buffer::Usages::uniform_binding())
-                    .uniform();
-
-                (node_count, edge_ref_count)
-            });
+        let counts_fallback = FallbackCounts::new(
+            count.map(|c| (c.node_count, c.edge_ref_count)),
+            &self.device,
+            (fallback_node_count, fallback_edge_ref_count),
+        );
 
         if dispatch_indirect {
             encoder = self.generate_dispatch.encode(
                 encoder,
                 GenerateDispatchResources {
                     group_size: self.group_size.uniform(),
-                    count: node_count.clone(),
+                    count: counts_fallback.node_count(),
                     dispatch: self.dispatch.storage(),
                 },
             );
@@ -200,7 +191,7 @@ impl MatchPairsByEdgeWeight {
             encoder = self.assign_node_colors.encode(
                 encoder,
                 AssignNodeColorsResources {
-                    count: node_count.clone(),
+                    count: counts_fallback.node_count(),
                     prng_seed: self.prng_seeds[round].uniform(),
                     nodes_match_state: nodes_match_state.storage(),
                     has_live_nodes: self.has_live_nodes.storage(),
@@ -212,13 +203,13 @@ impl MatchPairsByEdgeWeight {
             encoder = self.make_proposals.encode(
                 encoder,
                 MakeProposalsResources {
-                    node_count: node_count.clone(),
-                    edge_ref_count: edge_ref_count.clone(),
+                    node_count: counts_fallback.node_count(),
+                    edge_ref_count: counts_fallback.edge_ref_count(),
                     has_live_nodes: self.has_live_nodes.uniform(),
                     nodes_match_state: nodes_match_state.storage(),
-                    nodes_edge_offset: nodes_edge_offset.read_only_storage(),
-                    nodes_edges: nodes_edges.read_only_storage(),
-                    nodes_edge_weights: nodes_edge_weights.read_only_storage(),
+                    nodes_edge_offset: nodes_edge_offset.storage(),
+                    nodes_edges: nodes_edges.storage(),
+                    nodes_edge_weights: nodes_edge_weights.storage(),
                     nodes_proposal: self.proposals.storage(),
                 },
                 dispatch_indirect,
@@ -228,14 +219,14 @@ impl MatchPairsByEdgeWeight {
             encoder = self.find_matches.encode(
                 encoder,
                 FindMatchesResources {
-                    node_count: node_count.clone(),
-                    edge_ref_count: edge_ref_count.clone(),
+                    node_count: counts_fallback.node_count(),
+                    edge_ref_count: counts_fallback.edge_ref_count(),
                     has_live_nodes: self.has_live_nodes.uniform(),
                     nodes_match_state: nodes_match_state.storage(),
-                    nodes_edge_offset: nodes_edge_offset.read_only_storage(),
-                    nodes_edges: nodes_edges.read_only_storage(),
-                    nodes_edge_weights: nodes_edge_weights.read_only_storage(),
-                    nodes_proposal: self.proposals.read_only_storage(),
+                    nodes_edge_offset: nodes_edge_offset.storage(),
+                    nodes_edges: nodes_edges.storage(),
+                    nodes_edge_weights: nodes_edge_weights.storage(),
+                    nodes_proposal: self.proposals.storage(),
                 },
                 dispatch_indirect,
                 self.dispatch.view(),
@@ -248,7 +239,7 @@ impl MatchPairsByEdgeWeight {
         encoder = self.finalize_matching.encode(
             encoder,
             FinalizeMatchingResources {
-                count: node_count.clone(),
+                count: counts_fallback.node_count(),
                 nodes_match_state: nodes_match.storage(),
             },
             dispatch_indirect,

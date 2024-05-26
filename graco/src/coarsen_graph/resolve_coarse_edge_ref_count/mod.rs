@@ -1,4 +1,5 @@
-use empa::buffer::{ReadOnlyStorage, Storage, Uniform};
+use empa::access_mode::ReadWrite;
+use empa::buffer::{Storage, Uniform};
 use empa::command::{CommandEncoder, DispatchWorkgroups, ResourceBindingCommandEncoder};
 use empa::compute_pipeline::{
     ComputePipeline, ComputePipelineDescriptorBuilder, ComputeStageBuilder,
@@ -10,17 +11,17 @@ use empa::shader_module::{shader_source, ShaderSource};
 const SHADER: ShaderSource = shader_source!("shader.wgsl");
 
 #[derive(empa::resource_binding::Resources)]
-pub struct ResolveCoarseEdgeRefCountResources {
+pub struct ResolveCoarseEdgeRefCountResources<'a> {
     #[resource(binding = 0, visibility = "COMPUTE")]
-    pub fine_level_edge_ref_count: Uniform<u32>,
+    pub fine_level_edge_ref_count: Uniform<'a, u32>,
     #[resource(binding = 1, visibility = "COMPUTE")]
-    pub validity_prefix_sum: ReadOnlyStorage<[u32]>,
+    pub validity_prefix_sum: Storage<'a, [u32]>,
     #[resource(binding = 2, visibility = "COMPUTE")]
-    pub coarse_level_edge_ref_count: Storage<u32>,
+    pub coarse_level_edge_ref_count: Storage<'a, u32, ReadWrite>,
 }
 
 type ResourcesLayout =
-    <ResolveCoarseEdgeRefCountResources as empa::resource_binding::Resources>::Layout;
+    <ResolveCoarseEdgeRefCountResources<'static> as empa::resource_binding::Resources>::Layout;
 
 pub struct ResolveCoarseEdgeRefCount {
     device: Device,
@@ -39,7 +40,7 @@ impl ResolveCoarseEdgeRefCount {
             .create_compute_pipeline(
                 &ComputePipelineDescriptorBuilder::begin()
                     .layout(&pipeline_layout)
-                    .compute(&ComputeStageBuilder::begin(&shader, "main").finish())
+                    .compute(ComputeStageBuilder::begin(&shader, "main").finish())
                     .finish(),
             )
             .await;

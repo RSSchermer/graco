@@ -161,9 +161,9 @@ impl GraphRenderer {
         );
 
         encoder = encoder
-            .begin_render_pass(&RenderPassDescriptor::new(&RenderTarget {
+            .begin_render_pass(RenderPassDescriptor::new(&RenderTarget {
                 color: FloatAttachment {
-                    image: &output_texture.attachable_image(&AttachableImageDescriptor::default()),
+                    image: output_texture.attachable_image(&AttachableImageDescriptor::default()),
                     load_op: LoadOp::Clear([1.0; 4]),
                     store_op: StoreOp::Store,
                 },

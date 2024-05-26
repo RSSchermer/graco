@@ -22,13 +22,6 @@ use graco::matching::{
 };
 use web_viewer::{GraphRenderer, GraphRendererInput};
 
-struct GraphState {
-    nodes_edge_offset: Vec<u32>,
-    nodes_position: Vec<abi::Vec2<f32>>,
-    nodes_edges: Vec<u32>,
-    nodes_edge_weights: Vec<u32>,
-}
-
 fn main() {
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
     arwa::spawn_local(render().map(|res| res.unwrap()));

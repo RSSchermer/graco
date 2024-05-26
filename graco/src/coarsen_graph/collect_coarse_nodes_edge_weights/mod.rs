@@ -1,5 +1,6 @@
+use empa::access_mode::ReadWrite;
 use empa::buffer;
-use empa::buffer::{ReadOnlyStorage, Storage, Uniform};
+use empa::buffer::{Storage, Uniform};
 use empa::command::{CommandEncoder, DispatchWorkgroups, ResourceBindingCommandEncoder};
 use empa::compute_pipeline::{
     ComputePipeline, ComputePipelineDescriptorBuilder, ComputeStageBuilder,
@@ -13,21 +14,21 @@ use crate::coarsen_graph::DEFAULT_GROUP_SIZE;
 const SHADER: ShaderSource = shader_source!("shader.wgsl");
 
 #[derive(empa::resource_binding::Resources)]
-pub struct CollectCoarseNodesEdgeWeightsResources {
+pub struct CollectCoarseNodesEdgeWeightsResources<'a> {
     #[resource(binding = 0, visibility = "COMPUTE")]
-    pub count: Uniform<u32>,
+    pub count: Uniform<'a, u32>,
     #[resource(binding = 1, visibility = "COMPUTE")]
-    pub mapped_edges: ReadOnlyStorage<[u32]>,
+    pub mapped_edges: Storage<'a, [u32]>,
     #[resource(binding = 2, visibility = "COMPUTE")]
-    pub mapped_edge_weights: ReadOnlyStorage<[u32]>,
+    pub mapped_edge_weights: Storage<'a, [u32]>,
     #[resource(binding = 3, visibility = "COMPUTE")]
-    pub validity_prefix_sum: ReadOnlyStorage<[u32]>,
+    pub validity_prefix_sum: Storage<'a, [u32]>,
     #[resource(binding = 4, visibility = "COMPUTE")]
-    pub coarse_nodes_edge_weights: Storage<[u32]>,
+    pub coarse_nodes_edge_weights: Storage<'a, [u32], ReadWrite>,
 }
 
 type ResourcesLayout =
-    <CollectCoarseNodesEdgeWeightsResources as empa::resource_binding::Resources>::Layout;
+    <CollectCoarseNodesEdgeWeightsResources<'static> as empa::resource_binding::Resources>::Layout;
 
 pub struct CollectCoarseNodesEdgeWeights {
     device: Device,
@@ -46,7 +47,7 @@ impl CollectCoarseNodesEdgeWeights {
             .create_compute_pipeline(
                 &ComputePipelineDescriptorBuilder::begin()
                     .layout(&pipeline_layout)
-                    .compute(&ComputeStageBuilder::begin(&shader, "main").finish())
+                    .compute(ComputeStageBuilder::begin(&shader, "main").finish())
                     .finish(),
             )
             .await;

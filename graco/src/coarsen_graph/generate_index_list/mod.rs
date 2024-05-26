@@ -1,3 +1,4 @@
+use empa::access_mode::ReadWrite;
 use empa::buffer;
 use empa::buffer::{Storage, Uniform};
 use empa::command::{CommandEncoder, DispatchWorkgroups, ResourceBindingCommandEncoder};
@@ -13,14 +14,15 @@ use crate::coarsen_graph::DEFAULT_GROUP_SIZE;
 const SHADER: ShaderSource = shader_source!("shader.wgsl");
 
 #[derive(empa::resource_binding::Resources)]
-pub struct GenerateIndexListResources {
+pub struct GenerateIndexListResources<'a> {
     #[resource(binding = 0, visibility = "COMPUTE")]
-    pub count: Uniform<u32>,
+    pub count: Uniform<'a, u32>,
     #[resource(binding = 1, visibility = "COMPUTE")]
-    pub data: Storage<[u32]>,
+    pub data: Storage<'a, [u32], ReadWrite>,
 }
 
-type ResourcesLayout = <GenerateIndexListResources as empa::resource_binding::Resources>::Layout;
+type ResourcesLayout =
+    <GenerateIndexListResources<'static> as empa::resource_binding::Resources>::Layout;
 
 pub struct GenerateIndexList {
     device: Device,
@@ -39,7 +41,7 @@ impl GenerateIndexList {
             .create_compute_pipeline(
                 &ComputePipelineDescriptorBuilder::begin()
                     .layout(&pipeline_layout)
-                    .compute(&ComputeStageBuilder::begin(&shader, "main").finish())
+                    .compute(ComputeStageBuilder::begin(&shader, "main").finish())
                     .finish(),
             )
             .await;

@@ -30,10 +30,11 @@ use crate::coarsen_graph::resolve_coarse_edge_ref_count::{
     ResolveCoarseEdgeRefCount, ResolveCoarseEdgeRefCountResources,
 };
 use crate::coarsen_graph::DEFAULT_GROUP_SIZE;
+use crate::counts_fallback::FallbackCounts;
 
-pub struct CoarsenCounts {
-    pub node_count: Uniform<u32>,
-    pub edge_ref_count: Uniform<u32>,
+pub struct CoarsenCounts<'a> {
+    pub node_count: Uniform<'a, u32>,
+    pub edge_ref_count: Uniform<'a, u32>,
 }
 
 pub struct CoarsenGraphInput<'a, U0, U1, U2, U3, U4, U5> {
@@ -43,7 +44,7 @@ pub struct CoarsenGraphInput<'a, U0, U1, U2, U3, U4, U5> {
     pub fine_nodes_matching: buffer::View<'a, [u32], U3>,
     pub temporary_storage_0: buffer::View<'a, [u32], U4>,
     pub temporary_storage_1: buffer::View<'a, [u32], U5>,
-    pub counts: Option<CoarsenCounts>,
+    pub counts: Option<CoarsenCounts<'a>>,
 }
 
 pub struct CoarsenGraphOutput<'a, U0, U1, U2, U3, U4, U5, U6, U7> {
@@ -225,27 +226,16 @@ impl CoarsenGraph {
 
         let fallback_node_count = fine_nodes_edge_offset.len() as u32;
         let fallback_edge_ref_count = fine_nodes_edges.len() as u32;
-
-        let (node_count, edge_ref_count) = counts
-            .as_ref()
-            .map(|c| (c.node_count.clone(), c.edge_ref_count.clone()))
-            .unwrap_or_else(|| {
-                let node_count = self
-                    .device
-                    .create_buffer(fallback_node_count, buffer::Usages::uniform_binding())
-                    .uniform();
-                let edge_ref_count = self
-                    .device
-                    .create_buffer(fallback_edge_ref_count, buffer::Usages::uniform_binding())
-                    .uniform();
-
-                (node_count, edge_ref_count)
-            });
+        let counts_fallback = FallbackCounts::new(
+            counts.map(|c| (c.node_count, c.edge_ref_count)),
+            &self.device,
+            (fallback_node_count, fallback_edge_ref_count),
+        );
 
         encoder = self.generate_index_list.encode(
             encoder,
             GenerateIndexListResources {
-                count: node_count.clone(),
+                count: counts_fallback.node_count(),
                 data: coarse_nodes_mapping.storage(),
             },
             dispatch_indirect,
@@ -260,7 +250,7 @@ impl CoarsenGraph {
                 values: coarse_nodes_mapping,
                 temporary_key_storage: temporary_storage_0,
                 temporary_value_storage: temporary_storage_1,
-                count: Some(node_count.clone()),
+                count: Some(counts_fallback.node_count()),
             },
         );
 
@@ -270,7 +260,7 @@ impl CoarsenGraph {
             encoder,
             FindRunsInput {
                 data: fine_nodes_matching,
-                count: Some(node_count.clone()),
+                count: Some(counts_fallback.node_count()),
             },
             FindRunsOutput {
                 run_count: coarse_node_count,
@@ -284,7 +274,7 @@ impl CoarsenGraph {
             ScatterByInput {
                 scatter_by: coarse_nodes_mapping,
                 data: run_mapping,
-                count: Some(node_count.clone()),
+                count: Some(counts_fallback.node_count()),
             },
             fine_nodes_mapping,
         );
@@ -315,7 +305,7 @@ impl CoarsenGraph {
             GatherByInput {
                 gather_by: fine_nodes_edges,
                 data: fine_nodes_mapping,
-                count: Some(edge_ref_count.clone()),
+                count: Some(counts_fallback.edge_ref_count()),
             },
             storage_0,
         );
@@ -326,7 +316,7 @@ impl CoarsenGraph {
         encoder = self.generate_index_list.encode(
             encoder,
             GenerateIndexListResources {
-                count: edge_ref_count.clone(),
+                count: counts_fallback.edge_ref_count(),
                 data: storage_1.storage(),
             },
             dispatch_indirect,
@@ -344,7 +334,7 @@ impl CoarsenGraph {
                 values: storage_1,
                 temporary_key_storage: storage_2,
                 temporary_value_storage: storage_3,
-                count: Some(edge_ref_count.clone()),
+                count: Some(counts_fallback.edge_ref_count()),
             },
         );
 
@@ -356,10 +346,10 @@ impl CoarsenGraph {
         encoder = self.gather_edge_owner_list.encode(
             encoder,
             GatherEdgeOwnerListResources {
-                fine_node_count: node_count.clone(),
-                fine_edge_count: edge_ref_count.clone(),
-                fine_nodes_edge_offset: fine_nodes_edge_offset.read_only_storage(),
-                fine_nodes_mapping: fine_nodes_mapping.read_only_storage(),
+                fine_node_count: counts_fallback.node_count(),
+                fine_edge_count: counts_fallback.edge_ref_count(),
+                fine_nodes_edge_offset: fine_nodes_edge_offset.storage(),
+                fine_nodes_mapping: fine_nodes_mapping.storage(),
                 coarsened_edge_owner_list: storage_2.storage(),
             },
             dispatch_indirect,
@@ -372,7 +362,7 @@ impl CoarsenGraph {
             GatherByInput {
                 gather_by: storage_1,
                 data: storage_2,
-                count: Some(edge_ref_count.clone()),
+                count: Some(counts_fallback.edge_ref_count()),
             },
             storage_0,
         );
@@ -387,7 +377,7 @@ impl CoarsenGraph {
                 values: storage_1,
                 temporary_key_storage: storage_2,
                 temporary_value_storage: storage_3,
-                count: Some(edge_ref_count.clone()),
+                count: Some(counts_fallback.edge_ref_count()),
             },
         );
 
@@ -398,7 +388,7 @@ impl CoarsenGraph {
             GatherByInput {
                 gather_by: fine_nodes_edges,
                 data: fine_nodes_mapping,
-                count: Some(edge_ref_count.clone()),
+                count: Some(counts_fallback.edge_ref_count()),
             },
             storage_2,
         );
@@ -411,7 +401,7 @@ impl CoarsenGraph {
             GatherByInput {
                 gather_by: storage_1,
                 data: storage_2,
-                count: Some(edge_ref_count.clone()),
+                count: Some(counts_fallback.edge_ref_count()),
             },
             storage_3,
         );
@@ -424,7 +414,7 @@ impl CoarsenGraph {
             GatherByInput {
                 gather_by: storage_1,
                 data: fine_nodes_edge_weights,
-                count: Some(edge_ref_count.clone()),
+                count: Some(counts_fallback.edge_ref_count()),
             },
             storage_2,
         );
@@ -477,7 +467,7 @@ impl CoarsenGraph {
             encoder,
             FindRunsInput {
                 data: storage_0,
-                count: Some(edge_ref_count.clone()),
+                count: Some(counts_fallback.edge_ref_count()),
             },
             FindRunsOutput {
                 run_count: coarse_node_count,
@@ -505,8 +495,8 @@ impl CoarsenGraph {
         encoder = self.mark_coarse_edge_validity.encode(
             encoder,
             MarkCoarseEdgeValidityResources {
-                count: edge_ref_count.clone(),
-                owner_nodes: storage_0.read_only_storage(),
+                count: counts_fallback.edge_ref_count(),
+                owner_nodes: storage_0.storage(),
                 mapped_edges: storage_3.storage(),
                 validity: storage_1.storage(),
             },
@@ -525,7 +515,7 @@ impl CoarsenGraph {
             encoder,
             PrefixSumInput {
                 data: storage_1,
-                count: Some(edge_ref_count.clone()),
+                count: Some(counts_fallback.edge_ref_count()),
             },
         );
 
@@ -536,10 +526,10 @@ impl CoarsenGraph {
         encoder = self.collect_coarse_nodes_edge_weights.encode(
             encoder,
             CollectCoarseNodesEdgeWeightsResources {
-                count: edge_ref_count.clone(),
-                mapped_edges: storage_3.read_only_storage(),
-                mapped_edge_weights: storage_2.read_only_storage(),
-                validity_prefix_sum: storage_1.read_only_storage(),
+                count: counts_fallback.edge_ref_count(),
+                mapped_edges: storage_3.storage(),
+                mapped_edge_weights: storage_2.storage(),
+                validity_prefix_sum: storage_1.storage(),
                 coarse_nodes_edge_weights: storage_0.storage(),
             },
             dispatch_indirect,
@@ -553,9 +543,9 @@ impl CoarsenGraph {
         encoder = self.compact_coarse_edges.encode(
             encoder,
             CompactCoarseEdgesResources {
-                count: edge_ref_count.clone(),
-                mapped_edges: storage_3.read_only_storage(),
-                validity_prefix_sum: storage_1.read_only_storage(),
+                count: counts_fallback.edge_ref_count(),
+                mapped_edges: storage_3.storage(),
+                validity_prefix_sum: storage_1.storage(),
                 coarse_nodes_edges: storage_2.storage(),
             },
             dispatch_indirect,
@@ -568,8 +558,8 @@ impl CoarsenGraph {
         encoder = self.resolve_coarse_edge_ref_count.encode(
             encoder,
             ResolveCoarseEdgeRefCountResources {
-                fine_level_edge_ref_count: edge_ref_count,
-                validity_prefix_sum: storage_1.read_only_storage(),
+                fine_level_edge_ref_count: counts_fallback.edge_ref_count(),
+                validity_prefix_sum: storage_1.storage(),
                 coarse_level_edge_ref_count: coarse_edge_ref_count.storage(),
             },
         );
@@ -582,9 +572,9 @@ impl CoarsenGraph {
         encoder = self.finalize_coarse_nodes_edge_offset.encode(
             encoder,
             FinalizeCoarseNodesEdgeOffsetResources {
-                count: node_count,
-                mapped_edges: storage_3.read_only_storage(),
-                validity_prefix_sum: storage_1.read_only_storage(),
+                count: counts_fallback.node_count(),
+                mapped_edges: storage_3.storage(),
+                validity_prefix_sum: storage_1.storage(),
                 coarse_nodes_edge_offset: coarse_nodes_edge_offset.storage(),
             },
             dispatch_indirect,

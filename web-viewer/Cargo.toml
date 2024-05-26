@@ -8,6 +8,6 @@ publish = false
 [dependencies]
 arwa = { version = "0.1.1", path = "../../rudo/arwa" }
 bytemuck = { version = "1.14.0", features = ["derive"] }
-empa = { path = "../../glitz/empa", features = ["bytemuck"] }
-empa-glam = { version = "0.1.0", path = "../../glitz/empa_glam" }
+empa = { path = "../../glitz/crates/empa", features = ["bytemuck"] }
+empa-glam = { version = "0.1.0", path = "../../glitz/crates/empa_glam" }
 glam = "^0.24"

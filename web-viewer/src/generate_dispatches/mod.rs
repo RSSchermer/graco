@@ -1,3 +1,4 @@
+use empa::access_mode::ReadWrite;
 use empa::buffer::{Storage, Uniform};
 use empa::command::{
     CommandEncoder, DispatchWorkgroups, Draw, DrawIndexed, ResourceBindingCommandEncoder,
@@ -12,20 +13,21 @@ use empa::shader_module::{shader_source, ShaderSource};
 const SHADER: ShaderSource = shader_source!("shader.wgsl");
 
 #[derive(empa::resource_binding::Resources)]
-pub struct GenerateDispatchesResources {
+pub struct GenerateDispatchesResources<'a> {
     #[resource(binding = 0, visibility = "COMPUTE")]
-    pub triangle_index_count: Uniform<u32>,
+    pub triangle_index_count: Uniform<'a, u32>,
     #[resource(binding = 1, visibility = "COMPUTE")]
-    pub node_count: Uniform<u32>,
+    pub node_count: Uniform<'a, u32>,
     #[resource(binding = 2, visibility = "COMPUTE")]
-    pub edge_ref_count: Uniform<u32>,
+    pub edge_ref_count: Uniform<'a, u32>,
     #[resource(binding = 3, visibility = "COMPUTE")]
-    pub draw_point_triangles_dispatch: Storage<DrawIndexed>,
+    pub draw_point_triangles_dispatch: Storage<'a, DrawIndexed, ReadWrite>,
     #[resource(binding = 4, visibility = "COMPUTE")]
-    pub draw_edge_lines_dispatch: Storage<Draw>,
+    pub draw_edge_lines_dispatch: Storage<'a, Draw, ReadWrite>,
 }
 
-type ResourcesLayout = <GenerateDispatchesResources as empa::resource_binding::Resources>::Layout;
+type ResourcesLayout =
+    <GenerateDispatchesResources<'static> as empa::resource_binding::Resources>::Layout;
 
 pub struct GenerateDispatches {
     device: Device,
@@ -44,7 +46,7 @@ impl GenerateDispatches {
             .create_compute_pipeline(
                 &ComputePipelineDescriptorBuilder::begin()
                     .layout(&pipeline_layout)
-                    .compute(&ComputeStageBuilder::begin(&shader, "main").finish())
+                    .compute(ComputeStageBuilder::begin(&shader, "main").finish())
                     .finish(),
             )
             .await;

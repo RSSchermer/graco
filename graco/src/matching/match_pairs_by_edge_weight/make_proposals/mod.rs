@@ -1,5 +1,6 @@
+use empa::access_mode::ReadWrite;
 use empa::buffer;
-use empa::buffer::{ReadOnlyStorage, Storage, Uniform};
+use empa::buffer::{Storage, Uniform};
 use empa::command::{CommandEncoder, DispatchWorkgroups, ResourceBindingCommandEncoder};
 use empa::compute_pipeline::{
     ComputePipeline, ComputePipelineDescriptorBuilder, ComputeStageBuilder,
@@ -14,26 +15,27 @@ use crate::matching::match_pairs_by_edge_weight::GROUP_SIZE;
 const SHADER: ShaderSource = shader_source!("shader.wgsl");
 
 #[derive(empa::resource_binding::Resources)]
-pub struct MakeProposalsResources {
+pub struct MakeProposalsResources<'a> {
     #[resource(binding = 0, visibility = "COMPUTE")]
-    pub node_count: Uniform<u32>,
+    pub node_count: Uniform<'a, u32>,
     #[resource(binding = 1, visibility = "COMPUTE")]
-    pub edge_ref_count: Uniform<u32>,
+    pub edge_ref_count: Uniform<'a, u32>,
     #[resource(binding = 2, visibility = "COMPUTE")]
-    pub has_live_nodes: Uniform<u32>,
+    pub has_live_nodes: Uniform<'a, u32>,
     #[resource(binding = 3, visibility = "COMPUTE")]
-    pub nodes_match_state: Storage<[MatchState]>,
+    pub nodes_match_state: Storage<'a, [MatchState], ReadWrite>,
     #[resource(binding = 4, visibility = "COMPUTE")]
-    pub nodes_edge_offset: ReadOnlyStorage<[u32]>,
+    pub nodes_edge_offset: Storage<'a, [u32]>,
     #[resource(binding = 5, visibility = "COMPUTE")]
-    pub nodes_edges: ReadOnlyStorage<[u32]>,
+    pub nodes_edges: Storage<'a, [u32]>,
     #[resource(binding = 6, visibility = "COMPUTE")]
-    pub nodes_edge_weights: ReadOnlyStorage<[u32]>,
+    pub nodes_edge_weights: Storage<'a, [u32]>,
     #[resource(binding = 7, visibility = "COMPUTE")]
-    pub nodes_proposal: Storage<[u32]>,
+    pub nodes_proposal: Storage<'a, [u32], ReadWrite>,
 }
 
-type ResourcesLayout = <MakeProposalsResources as empa::resource_binding::Resources>::Layout;
+type ResourcesLayout =
+    <MakeProposalsResources<'static> as empa::resource_binding::Resources>::Layout;
 
 pub struct MakeProposals {
     device: Device,
@@ -52,7 +54,7 @@ impl MakeProposals {
             .create_compute_pipeline(
                 &ComputePipelineDescriptorBuilder::begin()
                     .layout(&pipeline_layout)
-                    .compute(&ComputeStageBuilder::begin(&shader, "main").finish())
+                    .compute(ComputeStageBuilder::begin(&shader, "main").finish())
                     .finish(),
             )
             .await;

@@ -4,7 +4,7 @@ use std::error::Error;
 use std::future::join;
 
 use arwa::window::window;
-use empa::adapter::Features;
+use empa::adapter::Feature;
 use empa::arwa::{NavigatorExt, PowerPreference, RequestAdapterOptions};
 use empa::buffer::Buffer;
 use empa::device::{Device, DeviceDescriptor};
@@ -219,7 +219,7 @@ async fn render() -> Result<(), Box<dyn Error>> {
         .ok_or("adapter not found")?;
     let device = adapter
         .request_device(&DeviceDescriptor {
-            required_features: Features::TIMESTAMP_QUERY,
+            required_features: Feature::TimestampQuery,
             required_limits: Default::default(),
         })
         .await?;
