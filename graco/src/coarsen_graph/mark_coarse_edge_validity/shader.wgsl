@@ -40,9 +40,9 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     }
 
     if validity_state == VALIDITY_VALID {
-        validity[index] = 1;
+        validity[index] = 1u;
     } else {
-        validity[index] = 0;
+        validity[index] = 0u;
     }
 
     // Note: we write and read from this buffer concurrently during this pass, but we always write back the exact same

@@ -28,7 +28,7 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
 
         let owner_index = fine_nodes_mapping[index];
 
-        for (var i = start; i < end; i += 1) {
+        for (var i = start; i < end; i += 1u) {
             coarsened_edge_owner_list[i] = owner_index;
         }
     }

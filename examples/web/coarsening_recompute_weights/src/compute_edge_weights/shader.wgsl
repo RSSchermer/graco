@@ -34,7 +34,7 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
 
     let pos_a = nodes_position[index];
 
-    for(var i = start; i < end; i += 1) {
+    for(var i = start; i < end; i += 1u) {
         let target_index = nodes_edges[i];
         let pos_b = nodes_position[target_index];
 

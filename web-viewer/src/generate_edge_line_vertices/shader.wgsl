@@ -43,7 +43,7 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let match_a = nodes_matching[index];
     let start_pos = nodes_position[index];
 
-    for (var i = edges_start; i < edges_end; i += 1) {
+    for (var i = edges_start; i < edges_end; i += 1u) {
         let other_index = nodes_edges[i];
         let end_pos = nodes_position[other_index];
 

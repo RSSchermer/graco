@@ -34,7 +34,7 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
 
     var position_sum = vec2(0.0, 0.0);
 
-    for(var i = start; i < end; i += 1) {
+    for(var i = start; i < end; i += 1u) {
         let mapping = coarse_nodes_mapping[i];
 
         position_sum += parent_level_positions[mapping];

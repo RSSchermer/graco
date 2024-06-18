@@ -54,6 +54,6 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
 
         nodes_match_state[index] = new_state;
 
-        has_live_nodes = 1;
+        has_live_nodes = 1u;
     }
 }

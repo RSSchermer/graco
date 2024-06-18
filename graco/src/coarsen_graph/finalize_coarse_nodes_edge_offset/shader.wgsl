@@ -28,7 +28,7 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     var new_offset = validity_prefix_sum[current_offset] - 1;
 
     if validity != VALIDITY_VALID {
-        new_offset += 1;
+        new_offset += 1u;
     }
 
     coarse_nodes_edge_offset[index] = new_offset;
