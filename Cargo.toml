@@ -2,6 +2,7 @@
 members = [
     "graco",
     "examples/web/coarsening",
+    "examples/web/coarsening_disconnected",
     "examples/web/coarsening_perf",
     "examples/web/coarsening_recompute_weights",
     "examples/web/match_pairs_by_edge_weight",

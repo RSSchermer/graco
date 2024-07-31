@@ -74,6 +74,7 @@ pub struct CoarsenGraph {
     gather_by: GatherBy<u32, u32>,
     prefix_sum_inclusive: PrefixSum<u32>,
     group_size: Buffer<u32, buffer::Usages<O, O, O, X, O, O, O, O, O, O>>,
+    edge_run_count: Buffer<u32, buffer::Usages<O, O, X, O, O, O, O, O, O, O>>,
     node_count_dispatch: Buffer<DispatchWorkgroups, buffer::Usages<O, X, X, O, O, O, O, O, O, O>>,
     edge_ref_count_dispatch:
         Buffer<DispatchWorkgroups, buffer::Usages<O, X, X, O, O, O, O, O, O, O>>,
@@ -114,6 +115,8 @@ impl CoarsenGraph {
 
         let group_size =
             device.create_buffer(DEFAULT_GROUP_SIZE, buffer::Usages::uniform_binding());
+        let edge_run_count =
+            device.create_buffer(DEFAULT_GROUP_SIZE, buffer::Usages::storage_binding());
         let node_count_dispatch = device.create_buffer(
             DispatchWorkgroups {
                 count_x: 1,
@@ -147,6 +150,7 @@ impl CoarsenGraph {
             gather_by,
             prefix_sum_inclusive,
             group_size,
+            edge_run_count,
             node_count_dispatch,
             edge_ref_count_dispatch,
         }
@@ -470,7 +474,7 @@ impl CoarsenGraph {
                 count: Some(counts_fallback.edge_ref_count()),
             },
             FindRunsOutput {
-                run_count: coarse_node_count,
+                run_count: self.edge_run_count.view(),
                 run_starts: coarse_nodes_edge_offset,
                 run_mapping: storage_1,
             },
